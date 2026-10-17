@@ -1,0 +1,670 @@
+<!-- ======================================================== -->
+<!-- DASHBOARD VIEW: CHECKLIST REPORT HISTORY & STORE COMPL.  -->
+<!-- ======================================================== -->
+<main id="dashboardView" class="hidden max-w-7xl mx-auto px-4 py-5 space-y-4 print:hidden">
+  
+  <div id="dashLoadingBar" class="hidden w-full bg-slate-200 h-1 overflow-hidden">
+    <div class="bg-brand h-full animate-pulse w-full"></div>
+  </div>
+
+  <!-- KARTU ANALITIK UTAMA -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div class="bg-white p-3.5 rounded border border-corp-border shadow-xs">
+      <span class="text-[10px] font-black uppercase text-corp-muted block">Rata-Rata Skor</span>
+      <h3 id="statAvgScore" class="text-2xl font-black text-corp-dark mt-1">0%</h3>
+    </div>
+    <div class="bg-white p-3.5 rounded border border-corp-border shadow-xs">
+      <span class="text-[10px] font-black uppercase text-corp-muted block">Total Walkthrough</span>
+      <h3 id="statTotalAudits" class="text-2xl font-black text-corp-dark mt-1">0</h3>
+    </div>
+    <div class="bg-white p-3.5 rounded border border-corp-border shadow-xs">
+      <span class="text-[10px] font-black uppercase text-corp-muted block">Defect / Temuan</span>
+      <h3 id="statTotalIssues" class="text-2xl font-black text-brand mt-1">0</h3>
+    </div>
+    <div class="bg-white p-3.5 rounded border border-corp-border shadow-xs">
+      <span class="text-[10px] font-black uppercase text-corp-muted block">Anomali Durasi (&lt; 5m)</span>
+      <h3 id="statSuspectFast" class="text-2xl font-black text-amber-600 mt-1">0</h3>
+    </div>
+  </div>
+
+  <!-- CHART DISTRIBUSI STATUS DINAMIS -->
+  <div class="bg-white p-3 rounded border border-corp-border shadow-xs space-y-2">
+    <div class="flex items-center justify-between text-xs">
+      <span class="font-black text-corp-dark uppercase text-[10px] tracking-wider">Distribusi Status Checklist</span>
+      <span id="txtChartSummary" class="text-[10px] font-bold text-corp-muted">0 Laporan</span>
+    </div>
+    <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex">
+      <div id="barCompleted" class="bg-emerald-600 h-full transition-all duration-300" style="width: 0%" title="Completed"></div>
+      <div id="barWaitingApproval" class="bg-amber-500 h-full transition-all duration-300" style="width: 0%" title="Waiting Approval"></div>
+      <div id="barWaitingFollowUp" class="bg-rose-500 h-full transition-all duration-300" style="width: 0%" title="Waiting Follow Up"></div>
+      <div id="barSubmitted" class="bg-slate-400 h-full transition-all duration-300" style="width: 0%" title="Submitted"></div>
+    </div>
+    <div class="flex flex-wrap items-center gap-4 text-[10px] font-bold pt-1">
+      <div class="flex items-center space-x-1.5">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+        <span class="text-corp-dark">Completed: <b id="lblCountCompleted">0</b></span>
+      </div>
+      <div class="flex items-center space-x-1.5">
+        <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+        <span class="text-corp-dark">Waiting Approval: <b id="lblCountWaitingApproval">0</b></span>
+      </div>
+      <div class="flex items-center space-x-1.5">
+        <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+        <span class="text-corp-dark">Waiting Follow Up: <b id="lblCountWaitingFollowUp">0</b></span>
+      </div>
+      <div class="flex items-center space-x-1.5">
+        <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+        <span class="text-corp-dark">Submitted: <b id="lblCountSubmitted">0</b></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MATRIKS ANALITIK -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
+    
+    <!-- KIRI: PERFORMA AUDITOR -->
+    <div class="bg-white rounded border border-corp-border shadow-xs overflow-hidden flex flex-col">
+      <div class="p-3 border-b border-corp-border flex flex-wrap items-center justify-between gap-2 bg-corp-surface">
+        <div class="flex items-center space-x-2">
+          <div class="flex bg-slate-200/80 p-0.5 rounded text-[11px] font-bold">
+            <button type="button" id="btnViewAuditor" onclick="switchPerformanceView('AUDITOR')" class="px-2.5 py-1 rounded bg-white text-brand shadow-xs">Per Auditor</button>
+            <button type="button" id="btnViewStore" onclick="switchPerformanceView('STORE')" class="px-2.5 py-1 rounded text-corp-muted hover:text-corp-dark">Per Toko</button>
+          </div>
+          <span id="txtPerformanceCounter" class="text-[10px] font-bold text-corp-muted hidden sm:inline">-</span>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5 text-xs">
+          <select id="selAuditorStoreFilter" onchange="renderPerformanceMatrix()" class="px-2 py-1 rounded border border-corp-border bg-white text-[10px] font-bold">
+            <option value="ALL">Semua Toko</option>
+          </select>
+          <select id="selAuditorRoleFilter" onchange="renderPerformanceMatrix()" class="px-2 py-1 rounded border border-corp-border bg-white text-[10px] font-bold">
+            <option value="ALL">Semua Jabatan</option>
+          </select>
+          <select id="selAuditorStatusFilter" onchange="renderPerformanceMatrix()" class="px-2 py-1 rounded border border-corp-border bg-white text-[10px] font-bold">
+            <option value="ALL">Semua Status</option>
+            <option value="ACTIVE">Aktif (&ge; 1x)</option>
+            <option value="INACTIVE">Belum Mengerjakan</option>
+          </select>
+          <button type="button" onclick="exportAuditorPerformanceCsv()" class="px-2 py-1 rounded border border-corp-border bg-white text-corp-dark hover:bg-slate-50 font-bold text-[10px] shadow-xs">Export CSV</button>
+        </div>
+      </div>
+
+      <div class="h-[340px] overflow-y-auto flex-1">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead id="tblPerfHead" class="bg-slate-50 border-b border-corp-border text-corp-muted font-black text-[10px] uppercase sticky top-0 z-10"></thead>
+          <tbody id="tblPerfBody" class="divide-y divide-corp-border">
+            <tr><td colspan="5" class="p-6 text-center text-corp-muted">Memuat data performa...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- KANAN: STORE COMPLIANCE (EKS KEPATUHAN UNIT TOKO) -->
+    <div class="bg-white rounded border border-corp-border shadow-xs overflow-hidden flex flex-col">
+      <div class="p-3 border-b border-corp-border flex items-center justify-between bg-corp-surface">
+        <span class="font-black text-corp-dark text-[11px] uppercase tracking-wider">STORE COMPLIANCE</span>
+        <span id="txtComplianceSummary" class="text-[10px] font-bold text-corp-muted">-</span>
+      </div>
+      <div class="h-[340px] overflow-y-auto flex-1">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="bg-slate-50 border-b border-corp-border text-corp-muted font-black text-[10px] uppercase sticky top-0 z-10">
+            <tr>
+              <th class="p-2">Unit Toko</th>
+              <th class="p-2 text-center">Opening</th>
+              <th class="p-2 text-center">Regular</th>
+              <th class="p-2 text-center">Closing</th>
+              <th class="p-2 text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody id="tblStoreComplianceBody" class="divide-y divide-corp-border">
+            <tr><td colspan="5" class="p-6 text-center text-corp-muted">Memuat data kepatuhan...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOOLBAR FILTER -->
+  <div class="bg-white p-3 rounded border border-corp-border shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="flex items-center space-x-1">
+        <span class="font-bold text-corp-muted">Toko:</span>
+        <select id="dashFilterStore" onchange="renderDashboardView()" class="px-2 py-1 rounded border border-corp-border bg-corp-surface font-semibold text-corp-dark">
+          <option value="ALL">Semua Unit Toko</option>
+        </select>
+      </div>
+      <div class="flex items-center space-x-1">
+        <span class="font-bold text-corp-muted">Frekuensi:</span>
+        <select id="dashFilterFrequency" onchange="renderDashboardView()" class="px-2 py-1 rounded border border-corp-border bg-corp-surface font-semibold text-corp-dark">
+          <option value="ALL">Semua Frekuensi</option>
+          <option value="Daily">Daily</option>
+          <option value="Weekly">Weekly</option>
+          <option value="Monthly">Monthly</option>
+        </select>
+      </div>
+      <div class="flex items-center space-x-1">
+        <span class="font-bold text-corp-muted">Status:</span>
+        <select id="dashFilterStatus" onchange="renderDashboardView()" class="px-2 py-1 rounded border border-corp-border bg-corp-surface font-semibold text-corp-dark">
+          <option value="ALL">Semua Status</option>
+          <option value="Completed">Completed</option>
+          <option value="Waiting Follow Up">Waiting Follow Up</option>
+          <option value="Waiting Approval">Waiting Approval</option>
+          <option value="Submitted">Submitted</option>
+        </select>
+      </div>
+      <div class="flex items-center space-x-1 border-l border-corp-border pl-2">
+        <input type="date" id="dashDateFrom" onchange="renderDashboardView()" class="px-2 py-1 rounded border border-corp-border text-[11px]">
+        <span>s/d</span>
+        <input type="date" id="dashDateTo" onchange="renderDashboardView()" class="px-2 py-1 rounded border border-corp-border text-[11px]">
+      </div>
+    </div>
+
+    <!-- QUICK PERIOD BUTTONS -->
+    <div class="flex flex-wrap items-center gap-1">
+      <button type="button" onclick="setDashboardQuickPeriod('TODAY')" class="px-2 py-1 rounded border font-bold text-[10px] hover:bg-slate-50">Hari Ini</button>
+      <button type="button" onclick="setDashboardQuickPeriod('YESTERDAY')" class="px-2 py-1 rounded border font-bold text-[10px] hover:bg-slate-50">Kemarin</button>
+      <button type="button" onclick="setDashboardQuickPeriod('LAST7')" class="px-2 py-1 rounded border font-bold text-[10px] hover:bg-slate-50">7 Hari</button>
+      <button type="button" onclick="setDashboardQuickPeriod('LAST30')" class="px-2 py-1 rounded border font-bold text-[10px] hover:bg-slate-50">30 Hari</button>
+      <button type="button" onclick="setDashboardQuickPeriod('RESET')" class="px-2 py-1 rounded border font-bold text-[10px] text-corp-muted hover:bg-slate-50">Reset</button>
+      <button type="button" onclick="loadAllOperationalData()" class="px-3 py-1 rounded bg-brand text-white font-bold hover:bg-brand-dark transition text-[11px]">Refresh</button>
+    </div>
+  </div>
+
+  <!-- TABEL RIWAYAT AUDIT: CHECKLIST REPORT HISTORY -->
+  <div class="bg-white rounded border border-corp-border shadow-xs overflow-hidden">
+    <div class="p-3 border-b border-corp-border flex items-center justify-between bg-corp-surface">
+      <span class="font-black text-corp-dark text-[11px] uppercase tracking-wider">CHECKLIST REPORT HISTORY</span>
+      <span id="txtTableCounter" class="font-bold text-corp-muted text-[11px]">0 Laporan</span>
+    </div>
+    <div class="max-h-[500px] overflow-y-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead class="sticky top-0 z-10 bg-slate-100 shadow-xs border-b border-corp-border text-corp-muted font-black text-[10px] uppercase">
+          <tr>
+            <th class="p-2.5">Waktu (WIB)</th>
+            <th class="p-2.5">Toko</th>
+            <th class="p-2.5">Auditor</th>
+            <th class="p-2.5">Tipe &amp; Frekuensi</th>
+            <th class="p-2.5 text-center">Skor</th>
+            <th class="p-2.5 text-center">Status</th>
+          </tr>
+        </thead>
+        <tbody id="tblDashboardBody" class="divide-y divide-corp-border">
+          <tr><td colspan="6" class="p-8 text-center text-corp-muted">Memuat data histori...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+  var rawReports = [];
+  var rawActionItems = [];
+  var masterEmployees = [];
+  var currentPerfView = "AUDITOR";
+  var isAuditorExpanded = false;
+
+  function formatWibDisplay(ts) {
+    if (!ts) return "-";
+    try {
+      var d = new Date(ts.indexOf("T") === -1 ? ts.replace(/-/g, "/") : ts);
+      if (isNaN(d.getTime())) return ts;
+      return d.toLocaleDateString("id-ID", { day: 'numeric', month: 'short' }) + " • " +
+             d.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }) + " WIB";
+    } catch(e) { return ts; }
+  }
+
+  function normalizeScoreNum(val) {
+    if (val === null || val === undefined) return 0;
+    var num = parseFloat(String(val).replace("%", "").trim());
+    if (isNaN(num)) return 0;
+    if (num > 0 && num <= 1) return Math.round(num * 100);
+    return Math.round(num);
+  }
+
+  function switchPerformanceView(v) {
+    currentPerfView = v;
+    var bA = document.getElementById("btnViewAuditor");
+    var bS = document.getElementById("btnViewStore");
+    if (v === "AUDITOR") {
+      if (bA) bA.className = "px-2.5 py-1 rounded bg-white text-brand shadow-xs";
+      if (bS) bS.className = "px-2.5 py-1 rounded text-corp-muted hover:text-corp-dark";
+    } else {
+      if (bS) bS.className = "px-2.5 py-1 rounded bg-white text-brand shadow-xs";
+      if (bA) bA.className = "px-2.5 py-1 rounded text-corp-muted hover:text-corp-dark";
+    }
+    renderPerformanceMatrix();
+  }
+
+  function loadAllOperationalData() {
+    var loadingBar = document.getElementById("dashLoadingBar");
+    if (loadingBar) loadingBar.classList.remove("hidden");
+
+    var role = (currentUser && currentUser.role) ? currentUser.role : "RM";
+    var uid = (currentUser && currentUser.id) ? currentUser.id : "";
+    var store = (currentUser && currentUser.storeCode) ? currentUser.storeCode : "ALL";
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (loadingBar) loadingBar.classList.add("hidden");
+        if (res) {
+          rawReports = res.reports || [];
+          rawActionItems = res.actionItems || [];
+          masterEmployees = res.employees || [];
+
+          populateStoreOptions();
+          populateJobTitleFilterOptions();
+          populateAuditorStoreFilterOptions();
+          renderDashboardView();
+          if (typeof renderActionItemsTable === "function") renderActionItemsTable();
+        }
+      })
+      .withFailureHandler(function(err) {
+        if (loadingBar) loadingBar.classList.add("hidden");
+        console.error("Gagal load data:", err);
+      })
+      .getHistoricalReports(role, store, "", uid);
+  }
+
+  function getFilteredReports() {
+    var elFrom = document.getElementById("dashDateFrom");
+    var elTo = document.getElementById("dashDateTo");
+    var elFreq = document.getElementById("dashFilterFrequency");
+    var elStore = document.getElementById("dashFilterStore");
+    var elStatus = document.getElementById("dashFilterStatus");
+
+    var fFrom = elFrom ? elFrom.value : "";
+    var fTo = elTo ? elTo.value : "";
+    var fFreq = elFreq ? elFreq.value : "ALL";
+    var fStore = elStore ? elStore.value : "ALL";
+    var fStatus = elStatus ? elStatus.value : "ALL";
+
+    return (rawReports || []).filter(function(r) {
+      if (!r) return false;
+      var rDate = String(r.timestamp || "").substring(0, 10);
+      if (fFrom && rDate && rDate < fFrom) return false;
+      if (fTo && rDate && rDate > fTo) return false;
+      if (fFreq !== "ALL" && String(r.frequency || "").toLowerCase() !== fFreq.toLowerCase()) return false;
+      if (fStore !== "ALL" && String(r.siteCode) !== fStore) return false;
+      if (fStatus !== "ALL" && String(r.processStatus || "").toLowerCase() !== fStatus.toLowerCase()) return false;
+      return true;
+    });
+  }
+
+  function renderDashboardView() {
+    var filtered = getFilteredReports();
+    var sumScore = 0, issues = 0, fast = 0;
+    filtered.forEach(function(r) {
+      sumScore += normalizeScoreNum(r.score);
+      issues += (Number(r.totalNo) || 0);
+      if (String(r.paceFlag || '').indexOf('SUSPECT_FAST') !== -1) fast++;
+    });
+
+    var sAvg = document.getElementById("statAvgScore");
+    var sTot = document.getElementById("statTotalAudits");
+    var sIss = document.getElementById("statTotalIssues");
+    var sFst = document.getElementById("statSuspectFast");
+
+    if (sAvg) sAvg.innerText = (filtered.length > 0 ? Math.round(sumScore / filtered.length) : 0) + "%";
+    if (sTot) sTot.innerText = filtered.length;
+    if (sIss) sIss.innerText = issues;
+    if (sFst) sFst.innerText = fast;
+
+    renderStatusProgressChart(filtered);
+    renderPerformanceMatrix();
+    renderStoreCompliance();
+    renderHistoryTable(filtered);
+  }
+
+  function renderStatusProgressChart(filtered) {
+    var cComp = 0, cAppr = 0, cFollow = 0, cSubm = 0;
+    var total = filtered.length;
+
+    filtered.forEach(function(r) {
+      var st = String(r.processStatus || "").toLowerCase();
+      if (st.indexOf("completed") !== -1 || st.indexOf("selesai") !== -1 || st.indexOf("approved") !== -1) cComp++;
+      else if (st.indexOf("waiting approval") !== -1) cAppr++;
+      else if (st.indexOf("waiting follow up") !== -1 || st.indexOf("action") !== -1) cFollow++;
+      else cSubm++;
+    });
+
+    var pComp = total > 0 ? (cComp / total) * 100 : 0;
+    var pAppr = total > 0 ? (cAppr / total) * 100 : 0;
+    var pFollow = total > 0 ? (cFollow / total) * 100 : 0;
+    var pSubm = total > 0 ? (cSubm / total) * 100 : 0;
+
+    var bComp = document.getElementById("barCompleted");
+    var bAppr = document.getElementById("barWaitingApproval");
+    var bFollow = document.getElementById("barWaitingFollowUp");
+    var bSubm = document.getElementById("barSubmitted");
+
+    if (bComp) bComp.style.width = pComp + "%";
+    if (bAppr) bAppr.style.width = pAppr + "%";
+    if (bFollow) bFollow.style.width = pFollow + "%";
+    if (bSubm) bSubm.style.width = pSubm + "%";
+
+    var lComp = document.getElementById("lblCountCompleted");
+    var lAppr = document.getElementById("lblCountWaitingApproval");
+    var lFollow = document.getElementById("lblCountWaitingFollowUp");
+    var lSubm = document.getElementById("lblCountSubmitted");
+    var sumTxt = document.getElementById("txtChartSummary");
+
+    if (lComp) lComp.innerText = cComp;
+    if (lAppr) lAppr.innerText = cAppr;
+    if (lFollow) lFollow.innerText = cFollow;
+    if (lSubm) lSubm.innerText = cSubm;
+    if (sumTxt) sumTxt.innerText = total + " Laporan";
+  }
+
+  function renderPerformanceMatrix() {
+    var thead = document.getElementById("tblPerfHead");
+    var tbody = document.getElementById("tblPerfBody");
+    var counterEl = document.getElementById("txtPerformanceCounter");
+    if (!tbody || !thead) return;
+
+    var filtered = getFilteredReports();
+
+    if (currentPerfView === 'AUDITOR') {
+      var rSel = document.getElementById("selAuditorRoleFilter");
+      var sSel = document.getElementById("selAuditorStatusFilter");
+      var stSel = document.getElementById("selAuditorStoreFilter");
+
+      var rFilter = rSel ? rSel.value : "ALL";
+      var sFilter = sSel ? sSel.value : "ALL";
+      var stFilter = stSel ? stSel.value : "ALL";
+
+      thead.innerHTML = '<tr>' +
+        '<th class="p-2">Auditor</th>' +
+        '<th class="p-2">Toko</th>' +
+        '<th class="p-2 text-center">Frekuensi</th>' +
+        '<th class="p-2 text-center">Rata-Rata</th>' +
+        '<th class="p-2 text-center">Status</th>' +
+      '</tr>';
+
+      var stats = {};
+      (masterEmployees || []).forEach(function(emp) {
+        var key = emp.name.toUpperCase().trim();
+        stats[key] = { name: emp.name, jobTitle: emp.jobTitle, siteCode: emp.storeCode, count: 0, totalScore: 0 };
+      });
+
+      filtered.forEach(function(r) {
+        var cleanName = (r.auditorName || "Auditor").split('(')[0].trim().toUpperCase();
+        if (!stats[cleanName]) {
+          stats[cleanName] = { name: r.auditorName.split('(')[0].trim(), jobTitle: r.jobTitle || "Auditor", siteCode: r.siteCode, count: 0, totalScore: 0 };
+        }
+        stats[cleanName].count++;
+        stats[cleanName].totalScore += normalizeScoreNum(r.score);
+      });
+
+      var list = Object.values(stats);
+      if (stFilter !== "ALL") list = list.filter(function(a) { return String(a.siteCode) === stFilter; });
+      if (rFilter !== "ALL") list = list.filter(function(a) { return a.jobTitle === rFilter; });
+      if (sFilter === "ACTIVE") list = list.filter(function(a) { return a.count > 0; });
+      else if (sFilter === "INACTIVE") list = list.filter(function(a) { return a.count === 0; });
+
+      list.sort(function(a, b) { return b.count - a.count; });
+      if (counterEl) counterEl.innerText = list.length + " Personil";
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-corp-muted">Tidak ada personil yang sesuai filter.</td></tr>';
+        return;
+      }
+
+      var displayList = isAuditorExpanded ? list : list.slice(0, 6);
+      var rows = displayList.map(function(a) {
+        var avg = a.count > 0 ? Math.round(a.totalScore / a.count) : 0;
+        var badge = a.count > 0 
+          ? '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[9px]">Aktif</span>'
+          : '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-900 font-bold text-[9px]">Belum Mengerjakan</span>';
+
+        return '<tr class="hover:bg-slate-50 transition">' +
+          '<td class="p-2">' +
+            '<span class="font-bold text-corp-dark block">' + a.name + '</span>' +
+            '<span class="text-[10px] text-corp-muted block font-semibold">' + a.jobTitle + '</span>' +
+          '</td>' +
+          '<td class="p-2 font-bold text-corp-dark">' + a.siteCode + '</td>' +
+          '<td class="p-2 text-center font-black ' + (a.count > 0 ? 'text-corp-dark' : 'text-rose-600') + '">' + a.count + 'x</td>' +
+          '<td class="p-2 text-center font-bold">' + (a.count > 0 ? avg + '%' : '-') + '</td>' +
+          '<td class="p-2 text-center">' + badge + '</td>' +
+        '</tr>';
+      }).join("");
+
+      if (list.length > 6) {
+        rows += '<tr><td colspan="5" class="p-2 text-center bg-slate-50 border-t">' +
+          '<button type="button" onclick="isAuditorExpanded=!isAuditorExpanded;renderPerformanceMatrix();" class="text-[11px] font-bold text-brand hover:underline">' +
+            (isAuditorExpanded ? '▲ Ciutkan (Top 6)' : '▼ Lihat Semua (' + list.length + ' Personil)') +
+          '</button>' +
+        '</td></tr>';
+      }
+      tbody.innerHTML = rows;
+
+    } else {
+      thead.innerHTML = '<tr><th class="p-2">Unit Toko</th><th class="p-2 text-center">Total Kunjungan</th><th class="p-2 text-center">Rata-Rata Skor</th><th class="p-2 text-center">Defect</th></tr>';
+      var storeMap = {};
+      (masterData.stores || []).forEach(function(s) {
+        storeMap[s.siteCode] = { siteCode: s.siteCode, siteName: s.siteName, count: 0, totalScore: 0, issues: 0 };
+      });
+
+      filtered.forEach(function(r) {
+        var c = r.siteCode;
+        if (storeMap[c]) {
+          storeMap[c].count++;
+          storeMap[c].totalScore += normalizeScoreNum(r.score);
+          storeMap[c].issues += (Number(r.totalNo) || 0);
+        }
+      });
+
+      var sRanked = Object.values(storeMap);
+      sRanked.sort(function(a, b) { return b.count - a.count; });
+      if (counterEl) counterEl.innerText = sRanked.length + " Unit Toko";
+
+      tbody.innerHTML = sRanked.map(function(s) {
+        var avg = s.count > 0 ? Math.round(s.totalScore / s.count) + "%" : "-";
+        return '<tr class="hover:bg-slate-50 transition">' +
+          '<td class="p-2 font-bold text-corp-dark">' + s.siteCode + ' - ' + s.siteName + '</td>' +
+          '<td class="p-2 text-center font-black text-corp-dark">' + s.count + 'x</td>' +
+          '<td class="p-2 text-center font-bold">' + avg + '</td>' +
+          '<td class="p-2 text-center font-black ' + (s.issues > 0 ? 'text-brand' : 'text-slate-400') + '">' + s.issues + '</td>' +
+        '</tr>';
+      }).join("");
+    }
+  }
+
+  // LOGIKA STORE COMPLIANCE (MEMBACA CHECKLIST_TYPE SECARA PRESISI)
+  function renderStoreCompliance() {
+    var tbody = document.getElementById("tblStoreComplianceBody");
+    if (!tbody) return;
+    var filtered = getFilteredReports();
+
+    var map = {};
+    (masterData.stores || []).forEach(function(s) {
+      map[s.siteCode] = { siteCode: s.siteCode, siteName: s.siteName, open: false, reg: 0, close: false };
+    });
+
+    filtered.forEach(function(r) {
+      var c = r.siteCode;
+      if (map[c]) {
+        var type = String(r.checklistType || "").toUpperCase().trim();
+        var freq = String(r.frequency || "").toLowerCase().trim();
+
+        if (type === "OPENING" || freq === "opening") {
+          map[c].open = true;
+        } else if (type === "CLOSING" || freq === "closing") {
+          map[c].close = true;
+        } else {
+          map[c].reg++;
+        }
+      }
+    });
+
+    var sList = Object.values(map);
+    tbody.innerHTML = sList.map(function(s) {
+      return '<tr class="hover:bg-slate-50 transition">' +
+        '<td class="p-2 font-bold text-corp-dark">' + s.siteCode + ' - ' + s.siteName + '</td>' +
+        '<td class="p-2 text-center">' + (s.open ? '<span class="text-emerald-700 font-bold">Sudah</span>' : '<span class="text-rose-700 font-bold">Belum</span>') + '</td>' +
+        '<td class="p-2 text-center font-black">' + s.reg + 'x</td>' +
+        '<td class="p-2 text-center">' + (s.close ? '<span class="text-emerald-700 font-bold">Sudah</span>' : '<span class="text-slate-400 font-bold">Belum</span>') + '</td>' +
+        '<td class="p-2 text-center font-bold text-[10px]">' + (s.reg > 0 ? 'Active' : '-') + '</td>' +
+      '</tr>';
+    }).join("");
+  }
+
+  function renderHistoryTable(filtered) {
+    var tbody = document.getElementById("tblDashboardBody");
+    var counter = document.getElementById("txtTableCounter");
+    if (!tbody) return;
+
+    if (counter) counter.innerText = filtered.length + " Laporan";
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-corp-muted">Tidak ada data laporan.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(function(r) {
+      var sc = normalizeScoreNum(r.score);
+      var st = String(r.processStatus || "Submitted").trim();
+      var badgeCls = "bg-slate-100 text-corp-muted";
+
+      if (st.toLowerCase().indexOf("completed") !== -1 || st.toLowerCase().indexOf("approved") !== -1) {
+        badgeCls = "bg-emerald-100 text-emerald-900 border border-emerald-300";
+      } else if (st.toLowerCase().indexOf("waiting approval") !== -1) {
+        badgeCls = "bg-amber-100 text-amber-900 border border-amber-300";
+      } else if (st.toLowerCase().indexOf("waiting follow up") !== -1 || st.toLowerCase().indexOf("action") !== -1) {
+        badgeCls = "bg-rose-100 text-rose-900 border border-rose-300";
+      }
+
+      var cType = String(r.checklistType || "REGULAR").toUpperCase();
+      var typeBadge = "";
+      if (cType === "OPENING") {
+        typeBadge = '<span class="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 font-black text-[9px] uppercase border border-amber-300">Opening</span>';
+      } else if (cType === "CLOSING") {
+        typeBadge = '<span class="px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-900 font-black text-[9px] uppercase border border-indigo-300">Closing</span>';
+      } else {
+        typeBadge = '<span class="px-1.5 py-0.2 rounded bg-slate-100 text-slate-800 font-bold text-[9px] uppercase">Walkthrough</span>';
+      }
+
+      return '<tr class="hover:bg-slate-50 transition">' +
+        '<td class="p-2.5 font-bold text-corp-dark">' + formatWibDisplay(r.timestamp) + '</td>' +
+        '<td class="p-2.5 font-black text-corp-dark">' + r.siteCode + ' - ' + r.siteName + '</td>' +
+        '<td class="p-2.5 font-semibold text-corp-dark">' +
+          r.auditorName.split('(')[0] +
+          '<span class="text-[10px] text-corp-muted block font-semibold">' + (r.jobTitle || "SUPERVISOR AREA") + '</span>' +
+        '</td>' +
+        '<td class="p-2.5">' +
+          '<div class="flex items-center space-x-1.5">' +
+            typeBadge +
+            '<span class="text-[10px] font-semibold text-corp-muted">' + r.frequency + '</span>' +
+          '</div>' +
+        '</td>' +
+        '<td class="p-2.5 text-center font-black ' + (sc >= 85 ? 'text-emerald-700' : 'text-brand') + '">' + sc + '%</td>' +
+        '<td class="p-2.5 text-center">' +
+          '<span class="px-2 py-0.5 rounded font-black text-[10px] uppercase ' + badgeCls + '">' + st + '</span>' +
+        '</td>' +
+      '</tr>';
+    }).join("");
+  }
+
+  function exportAuditorPerformanceCsv() {
+    var filtered = getFilteredReports();
+    var stats = {};
+
+    (masterEmployees || []).forEach(function(emp) {
+      stats[emp.name.toUpperCase().trim()] = { name: emp.name, jobTitle: emp.jobTitle, siteCode: emp.storeCode, count: 0, totalScore: 0 };
+    });
+
+    filtered.forEach(function(r) {
+      var key = (r.auditorName || "").split('(')[0].trim().toUpperCase();
+      if (!stats[key]) stats[key] = { name: r.auditorName.split('(')[0].trim(), jobTitle: r.jobTitle, siteCode: r.siteCode, count: 0, totalScore: 0 };
+      stats[key].count++;
+      stats[key].totalScore += normalizeScoreNum(r.score);
+    });
+
+    var rows = [["Nama Auditor", "Job Title", "Unit Toko", "Frekuensi", "Rata-Rata Skor", "Status"]];
+    Object.values(stats).forEach(function(a) {
+      var avg = a.count > 0 ? Math.round(a.totalScore / a.count) + "%" : "-";
+      rows.push([a.name, a.jobTitle, a.siteCode, a.count, avg, a.count > 0 ? "Aktif" : "Belum Mengerjakan"]);
+    });
+
+    var csvContent = "data:text/csv;charset=utf-8," + rows.map(function(e) { return e.join(","); }).join("\n");
+    var link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csvContent));
+    link.setAttribute("download", "Performa_Auditor_" + new Date().toISOString().substring(0, 10) + ".csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function populateStoreOptions() {
+    var select = document.getElementById("dashFilterStore");
+    if (!select || !masterData.stores) return;
+    var cur = select.value;
+    select.innerHTML = '<option value="ALL">Semua Unit Toko</option>';
+    masterData.stores.forEach(function(s) {
+      select.innerHTML += '<option value="' + s.siteCode + '">' + s.siteCode + ' - ' + s.siteName + '</option>';
+    });
+    select.value = cur;
+  }
+
+  function populateAuditorStoreFilterOptions() {
+    var select = document.getElementById("selAuditorStoreFilter");
+    if (!select || !masterData.stores) return;
+    var cur = select.value;
+    select.innerHTML = '<option value="ALL">Semua Toko</option>';
+    masterData.stores.forEach(function(s) {
+      select.innerHTML += '<option value="' + s.siteCode + '">' + s.siteCode + ' - ' + s.siteName + '</option>';
+    });
+    select.value = cur;
+  }
+
+  function populateJobTitleFilterOptions() {
+    var select = document.getElementById("selAuditorRoleFilter");
+    if (!select || !masterEmployees) return;
+    var cur = select.value;
+    var uniqueJobs = [];
+    masterEmployees.forEach(function(e) {
+      if (e.jobTitle && uniqueJobs.indexOf(e.jobTitle) === -1) {
+        uniqueJobs.push(e.jobTitle);
+      }
+    });
+    select.innerHTML = '<option value="ALL">Semua Jabatan</option>';
+    uniqueJobs.forEach(function(j) {
+      select.innerHTML += '<option value="' + j + '">' + j + '</option>';
+    });
+    select.value = cur;
+  }
+
+  function setDashboardQuickPeriod(period) {
+    var f = document.getElementById("dashDateFrom");
+    var t = document.getElementById("dashDateTo");
+    var now = new Date();
+
+    function toIsoDate(d) {
+      return d.toISOString().substring(0, 10);
+    }
+
+    if (period === 'TODAY') {
+      var today = toIsoDate(now);
+      if (f) f.value = today;
+      if (t) t.value = today;
+    } else if (period === 'YESTERDAY') {
+      var yest = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      var yStr = toIsoDate(yest);
+      if (f) f.value = yStr;
+      if (t) t.value = yStr;
+    } else if (period === 'LAST7') {
+      var l7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      if (f) f.value = toIsoDate(l7);
+      if (t) t.value = toIsoDate(now);
+    } else if (period === 'LAST30') {
+      var l30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      if (f) f.value = toIsoDate(l30);
+      if (t) t.value = toIsoDate(now);
+    } else if (period === 'RESET') {
+      if (f) f.value = "";
+      if (t) t.value = "";
+      var elStatus = document.getElementById("dashFilterStatus");
+      if (elStatus) elStatus.value = "ALL";
+    }
+    renderDashboardView();
+  }
+</script>

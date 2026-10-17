@@ -1,0 +1,333 @@
+<!-- ======================================================== -->
+<!-- RESULT MODULE: RE-DESIGNED CLEAN TABLE & METRICS HEADER  -->
+<!-- ======================================================== -->
+<main id="resultView" class="hidden max-w-7xl mx-auto px-4 py-5 space-y-4 print:hidden">
+  
+  <!-- SUMMARY CARD & CONTROL HEADER -->
+  <div class="bg-white p-4 rounded border border-corp-border shadow-xs space-y-3">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-corp-border pb-3">
+      <div>
+        <h2 class="text-xs font-black uppercase tracking-wider text-corp-dark">Daftar Temuan &amp; Tindak Lanjut Toko</h2>
+        <p class="text-[11px] text-corp-muted mt-0.5">Monitoring perbaikan fisik lapangan dan respon penanganan tiket</p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center space-x-1">
+          <span class="text-[10px] font-bold text-corp-muted uppercase">Toko:</span>
+          <select id="selResultStoreFilter" onchange="renderActionItemsTable()" class="px-2 py-1 rounded border border-corp-border bg-corp-surface font-bold text-xs text-corp-dark focus:outline-hidden">
+            <option value="ALL">Semua Unit Toko</option>
+          </select>
+        </div>
+
+        <div class="flex bg-slate-100 p-0.5 rounded border border-corp-border">
+          <button type="button" onclick="switchActionSubTab('ONGOING')" id="subTabOngoing" class="px-3 py-1 rounded bg-white shadow-xs text-brand font-black text-xs">
+            On-Going <span id="badgeOngoingCount" class="ml-1 px-1.5 py-0.2 bg-brand text-white text-[9px] rounded-full">0</span>
+          </button>
+          <button type="button" onclick="switchActionSubTab('ARCHIVED')" id="subTabArchived" class="px-3 py-1 rounded text-corp-muted font-bold text-xs">
+            Archived <span id="badgeArchivedCount" class="ml-1 px-1.5 py-0.2 bg-slate-400 text-white text-[9px] rounded-full">0</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 MINI METRICS CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+      <div class="p-2.5 rounded bg-corp-surface border border-corp-border flex items-center justify-between">
+        <span class="text-[10px] font-bold uppercase text-corp-muted">Total Temuan Aktif</span>
+        <span id="metricActiveIssues" class="text-base font-black text-corp-dark">0</span>
+      </div>
+      <div class="p-2.5 rounded bg-rose-50 border border-rose-200 flex items-center justify-between">
+        <span class="text-[10px] font-bold uppercase text-rose-900">Overdue (&gt;48 Jam)</span>
+        <span id="metricOverdueIssues" class="text-base font-black text-brand">0</span>
+      </div>
+      <div class="p-2.5 rounded bg-amber-50 border border-amber-200 flex items-center justify-between">
+        <span class="text-[10px] font-bold uppercase text-amber-900">Perlu Tindak Lanjut</span>
+        <span id="metricPendingFollowUp" class="text-base font-black text-amber-700">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLE CONTAINER BERSIH TANPA KOTAK BERTUMPUK -->
+  <div class="bg-white rounded border border-corp-border shadow-xs overflow-hidden">
+    <div class="max-h-[600px] overflow-y-auto">
+      <table class="w-full text-left border-collapse text-xs table-fixed">
+        <thead class="sticky top-0 z-10 bg-slate-100 border-b border-corp-border text-corp-muted font-black text-[10px] uppercase">
+          <tr>
+            <th class="p-2.5 w-[14%]">Waktu &amp; ID</th>
+            <th class="p-2.5 w-[20%]">Unit Toko &amp; Auditor</th>
+            <th class="p-2.5 w-[42%]">Temuan &amp; Action Plan</th>
+            <th class="p-2.5 w-[12%] text-center">Status &amp; SLA</th>
+            <th id="thActionHeader" class="p-2.5 w-[12%] text-center">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="tblActionItemsBody" class="divide-y divide-corp-border">
+          <tr><td colspan="5" class="p-8 text-center text-corp-muted">Memuat data temuan...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- POP-UP MODAL TINDAK LANJUT / REMIND SM -->
+  <div id="modalActionFollowUp" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl border border-corp-border shadow-2xl max-w-md w-full p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-corp-border pb-3">
+        <h3 id="modalTitle" class="text-xs font-black uppercase tracking-wider text-corp-dark">Tindak Lanjut Temuan</h3>
+        <button type="button" onclick="closeFollowUpModal()" class="text-corp-muted hover:text-corp-dark font-black text-sm">✕</button>
+      </div>
+
+      <div class="space-y-2 text-xs">
+        <div>
+          <span class="text-[10px] font-bold text-corp-muted block">ID Tiket &amp; Toko</span>
+          <span id="modalMetaInfo" class="font-bold text-corp-dark block">-</span>
+        </div>
+        <div>
+          <span class="text-[10px] font-bold text-corp-muted block">Uraian SOP</span>
+          <p id="modalSopText" class="font-semibold text-corp-dark text-[11px] leading-tight">-</p>
+        </div>
+        <div class="p-2.5 rounded bg-rose-50 border border-rose-200">
+          <span class="text-[9px] font-black uppercase text-rose-900 block">Issue Lapangan:</span>
+          <p id="modalIssueText" class="text-[11px] font-semibold text-rose-950 mt-0.5">-</p>
+        </div>
+
+        <div id="containerModalInput">
+          <label class="block font-black uppercase text-[10px] text-corp-muted mb-1">Catatan Realisasi Perbaikan *</label>
+          <textarea id="txtFollowUpNotes" rows="3" placeholder="Jelaskan tindakan perbaikan yang telah dikerjakan di toko..." class="w-full p-2 rounded border border-corp-border bg-corp-surface text-xs font-semibold focus:bg-white focus:outline-hidden"></textarea>
+          
+          <div class="mt-2">
+            <label class="block font-black uppercase text-[10px] text-corp-muted mb-1">Update Status Tiket</label>
+            <select id="selFollowUpStatus" class="w-full p-2 rounded border border-corp-border bg-corp-surface font-bold text-xs text-corp-dark">
+              <option value="In Progress">In Progress</option>
+              <option value="Archived">Archived (Selesai)</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="containerModalReminder" class="hidden p-3 rounded bg-amber-50 border border-amber-200 text-amber-950 text-xs">
+          Apakah Anda ingin mengirimkan pengingat (*reminder*) resmi kepada Store Manager terkait penyelesaian temuan ini?
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-2 border-t border-corp-border">
+        <button type="button" onclick="closeFollowUpModal()" class="px-3 py-1.5 rounded border border-corp-border text-corp-muted font-bold text-xs">Batal</button>
+        <button type="button" id="btnSubmitModalAction" onclick="submitModalActionFollowUp()" class="px-4 py-1.5 rounded bg-brand hover:bg-brand-dark text-white font-black text-xs shadow-xs transition">Simpan</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  var currentActionSubTab = "ONGOING";
+  var selectedModalActionId = null;
+
+  function switchActionSubTab(tab) {
+    currentActionSubTab = tab;
+    var btnOngoing = document.getElementById("subTabOngoing");
+    var btnArchived = document.getElementById("subTabArchived");
+    var thAction = document.getElementById("thActionHeader");
+
+    if (tab === "ONGOING") {
+      if (btnOngoing) btnOngoing.className = "px-3 py-1 rounded bg-white shadow-xs text-brand font-black text-xs";
+      if (btnArchived) btnArchived.className = "px-3 py-1 rounded text-corp-muted font-bold text-xs";
+      if (thAction) thAction.innerText = "Aksi";
+    } else {
+      if (btnOngoing) btnOngoing.className = "px-3 py-1 rounded text-corp-muted font-bold text-xs";
+      if (btnArchived) btnArchived.className = "px-3 py-1 rounded bg-white shadow-xs text-brand font-black text-xs";
+      if (thAction) thAction.innerText = "SLA (Days)";
+    }
+    renderActionItemsTable();
+  }
+
+  function formatTimeWib(timestampStr) {
+    if (!timestampStr) return "-";
+    try {
+      var d = new Date(timestampStr.indexOf("T") === -1 ? timestampStr.replace(/-/g, "/") : timestampStr);
+      if (isNaN(d.getTime())) return timestampStr;
+      return d.toLocaleDateString("id-ID", { day: 'numeric', month: 'short' }) + " • " +
+             d.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }) + " WIB";
+    } catch(e) { return timestampStr; }
+  }
+
+  function renderActionItemsTable() {
+    var tbody = document.getElementById("tblActionItemsBody");
+    if (!tbody) return;
+
+    var curRole = (currentUser && currentUser.role) ? currentUser.role : "RM";
+    var selStore = document.getElementById("selResultStoreFilter");
+    var fStore = selStore ? selStore.value : "ALL";
+
+    // Populate filter toko jika belum ada
+    if (selStore && masterData.stores && selStore.options.length <= 1) {
+      masterData.stores.forEach(function(s) {
+        var opt = document.createElement("option");
+        opt.value = s.siteCode;
+        opt.innerText = s.siteCode + " - " + s.siteName;
+        selStore.appendChild(opt);
+      });
+    }
+
+    var allItems = rawActionItems || [];
+    var ongoingItems = allItems.filter(function(a) { return String(a.status || "").toLowerCase() !== "archived"; });
+    var archivedItems = allItems.filter(function(a) { return String(a.status || "").toLowerCase() === "archived"; });
+
+    var overdueCount = ongoingItems.filter(function(a) { return a.isOverdue; }).length;
+    var pendingCount = ongoingItems.filter(function(a) { return String(a.status || "").toLowerCase() === "pending"; }).length;
+
+    // Update Mini Metrics
+    var mAct = document.getElementById("metricActiveIssues");
+    var mOvd = document.getElementById("metricOverdueIssues");
+    var mPnd = document.getElementById("metricPendingFollowUp");
+    var bOngoing = document.getElementById("badgeOngoingCount");
+    var bArchived = document.getElementById("badgeArchivedCount");
+
+    if (mAct) mAct.innerText = ongoingItems.length;
+    if (mOvd) mOvd.innerText = overdueCount;
+    if (mPnd) mPnd.innerText = pendingCount;
+    if (bOngoing) bOngoing.innerText = ongoingItems.length;
+    if (bArchived) bArchived.innerText = archivedItems.length;
+
+    var items = (currentActionSubTab === "ONGOING" ? ongoingItems : archivedItems).filter(function(item) {
+      if (fStore !== "ALL" && String(item.siteCode) !== fStore) return false;
+      return true;
+    });
+
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-corp-muted">Belum ada data temuan dalam kategori ini.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = items.map(function(act) {
+      var slaBadge = act.isOverdue ? (
+        '<span class="px-1.5 py-0.5 rounded bg-rose-600 text-white font-black text-[9px] uppercase tracking-wider block mt-1">' +
+          'Overdue • ' + act.ageHours + 'h' +
+        '</span>'
+      ) : (
+        '<span class="px-1.5 py-0.5 rounded bg-slate-100 text-corp-muted font-bold text-[9px] block mt-1">' +
+          act.ageHours + ' jam lalu' +
+        '</span>'
+      );
+
+      var actionBtn = "";
+      if (currentActionSubTab === "ONGOING") {
+        if (curRole === "RM") {
+          actionBtn = '<button type="button" onclick="openActionModal(\'' + act.actionId + '\', true)" class="w-full py-1.5 px-2 rounded border border-amber-600 bg-white hover:bg-amber-50 text-amber-800 font-bold text-[10px] shadow-2xs transition">Remind SM</button>';
+        } else {
+          actionBtn = '<button type="button" onclick="openActionModal(\'' + act.actionId + '\', false)" class="w-full py-1.5 px-2 rounded bg-brand hover:bg-brand-dark text-white font-bold text-[10px] shadow-xs transition">Tindak Lanjut</button>';
+        }
+      } else {
+        // TAB ARCHIVED: TAMPILKAN ANGKA HARI SAJA (MISAL: 2)
+        actionBtn = '<span class="font-black text-xs text-corp-dark block text-center">' + (act.slaDays || 0) + '</span>';
+      }
+
+      var displayName = (act.siteName && act.siteName !== act.siteCode) 
+        ? act.siteCode + " - " + act.siteName 
+        : "Toko " + act.siteCode;
+
+      return '<tr class="hover:bg-slate-50 transition border-b border-corp-border/60">' +
+        // WAKTU & ID
+        '<td class="p-2.5 align-top">' +
+          '<span class="font-bold text-corp-dark block text-[11px]">' + formatTimeWib(act.timestamp) + '</span>' +
+          '<span class="text-[9px] text-corp-muted block mt-0.5 font-mono truncate" title="' + act.actionId + '">' + act.actionId.substring(0, 16) + '...</span>' +
+        '</td>' +
+        // UNIT TOKO & AUDITOR
+        '<td class="p-2.5 align-top">' +
+          '<span class="font-black text-corp-dark block text-[11px] leading-tight">' + displayName + '</span>' +
+          '<span class="text-[11px] font-semibold text-corp-dark block mt-0.5 truncate">' + act.auditorName.split('(')[0] + '</span>' +
+          '<span class="text-[10px] text-corp-muted block truncate">' + act.jobTitle + '</span>' +
+        '</td>' +
+        // TEMUAN & ACTION PLAN (BERSIH & TERSTRUKTUR TANPA KOTAK BERLAPIS)
+        '<td class="p-2.5 align-top space-y-1.5">' +
+          '<h4 class="font-bold text-corp-dark text-[11px] leading-tight">' + act.questionText + '</h4>' +
+          '<div class="text-[11px] leading-tight">' +
+            '<span class="inline-block px-1 py-0.2 rounded bg-rose-100 text-brand font-black text-[9px] uppercase mr-1">Issue</span>' +
+            '<span class="text-corp-dark font-medium">' + act.issueDescription + '</span>' +
+          '</div>' +
+          '<div class="text-[11px] leading-tight text-corp-muted">' +
+            '<span class="inline-block px-1 py-0.2 rounded bg-slate-200 text-slate-800 font-black text-[9px] uppercase mr-1">Plan</span>' +
+            '<span class="font-normal">' + act.actionPlan + '</span>' +
+          '</div>' +
+        '</td>' +
+        // STATUS & SLA
+        '<td class="p-2.5 align-top text-center">' +
+          '<span class="px-2 py-0.5 rounded bg-slate-100 text-corp-dark font-black text-[10px] block">' + act.status + '</span>' +
+          slaBadge +
+        '</td>' +
+        // AKSI
+        '<td class="p-2.5 align-top text-center">' +
+          actionBtn +
+        '</td>' +
+      '</tr>';
+    }).join("");
+  }
+
+  function openActionModal(actionId, isReminder) {
+    selectedModalActionId = actionId;
+    var item = (rawActionItems || []).find(function(a) { return a.actionId === actionId; });
+    if (!item) return;
+
+    var modal = document.getElementById("modalActionFollowUp");
+    var mTitle = document.getElementById("modalTitle");
+    var mMeta = document.getElementById("modalMetaInfo");
+    var mSop = document.getElementById("modalSopText");
+    var mIssue = document.getElementById("modalIssueText");
+    var cInput = document.getElementById("containerModalInput");
+    var cRemind = document.getElementById("containerModalReminder");
+    var btnSubmit = document.getElementById("btnSubmitModalAction");
+
+    mMeta.innerText = item.actionId + " • " + (item.siteName || ("Toko " + item.siteCode));
+    mSop.innerText = item.questionText;
+    mIssue.innerText = item.issueDescription;
+
+    if (isReminder) {
+      mTitle.innerText = "Kirim Pengingat ke Store Manager";
+      cInput.classList.add("hidden");
+      cRemind.classList.remove("hidden");
+      btnSubmit.innerText = "Kirim Reminder";
+    } else {
+      mTitle.innerText = "Tindak Lanjut Realisasi Perbaikan";
+      cInput.classList.remove("hidden");
+      cRemind.classList.add("hidden");
+      btnSubmit.innerText = "Simpan Perbaikan";
+      document.getElementById("txtFollowUpNotes").value = item.actionPlan || "";
+    }
+
+    modal.classList.remove("hidden");
+  }
+
+  function closeFollowUpModal() {
+    var modal = document.getElementById("modalActionFollowUp");
+    if (modal) modal.classList.add("hidden");
+    selectedModalActionId = null;
+  }
+
+  function submitModalActionFollowUp() {
+    if (!selectedModalActionId) return;
+    var btn = document.getElementById("btnSubmitModalAction");
+    var curRole = (currentUser && currentUser.role) ? currentUser.role : "RM";
+    var userStore = (currentUser && currentUser.storeCode) ? currentUser.storeCode : "ALL";
+    var isReminder = (curRole === "RM");
+
+    var newStatus = document.getElementById("selFollowUpStatus").value;
+    var notes = document.getElementById("txtFollowUpNotes").value;
+
+    btn.disabled = true;
+    btn.innerText = "Memproses...";
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        btn.disabled = false;
+        closeFollowUpModal();
+        if (res && res.success) {
+          alert(res.message);
+          loadAllOperationalData();
+        } else {
+          alert("Gagal: " + (res ? res.message : "Error"));
+        }
+      })
+      .withFailureHandler(function(err) {
+        btn.disabled = false;
+        closeFollowUpModal();
+        alert("Koneksi gagal: " + err.toString());
+      })
+      .updateActionItemRecord(selectedModalActionId, newStatus, notes, isReminder, userStore, curRole);
+  }
+</script>
