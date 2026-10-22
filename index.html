@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>MDS Retailing - Store Visit Audit & Analytics</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- FAVICON MDS -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23EE1D23'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' fill='%23FFFFFF' font-family='sans-serif' font-weight='900' font-size='12'>MDS</text></svg>">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#EE1D23', dark: '#C7141A', surface: '#FFF1F1', border: '#FECDD3' },
+            corp: { dark: '#1E2022', muted: '#68717A', border: '#E5E7EB', surface: '#F8F9FA' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#F4F6F8] text-corp-dark font-sans antialiased min-h-screen flex flex-col">
+
+  <!-- 1. FULLSCREEN LOGIN OVERLAY -->
+  <div id="fullAuthScreen" class="fixed inset-0 z-50 bg-[#F4F6F8] flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-xl border border-corp-border shadow-xl p-6 space-y-4">
+      <div class="text-center space-y-1">
+        <div class="inline-block bg-brand text-white font-black text-sm px-3.5 py-1 rounded shadow-xs tracking-wider">MDS RETAILING</div>
+        <h2 class="text-xs font-bold text-corp-dark uppercase tracking-wider pt-2">Store Visit Audit System</h2>
+        <p class="text-[11px] text-corp-muted">Silakan masuk menggunakan kredensial terdaftar</p>
+      </div>
+
+      <form id="authLoginForm" onsubmit="executeAppLogin(event)" class="space-y-3 pt-2 text-xs">
+        <div>
+          <label class="block font-black uppercase text-[10px] text-corp-muted mb-1">ID Karyawan / NIK *</label>
+          <input type="text" id="inputAuthId" required placeholder="Contoh: M007803 atau M223247" class="w-full p-2.5 rounded border border-corp-border bg-corp-surface font-bold text-corp-dark focus:bg-white focus:outline-hidden">
+        </div>
+        <div>
+          <label class="block font-black uppercase text-[10px] text-corp-muted mb-1">PIN / Password *</label>
+          <input type="password" id="inputAuthPin" required placeholder="Masukkan PIN" class="w-full p-2.5 rounded border border-corp-border bg-corp-surface font-bold text-corp-dark focus:bg-white focus:outline-hidden">
+        </div>
+        <div id="authErrorMsg" class="hidden p-2.5 rounded bg-rose-50 border border-rose-200 text-rose-900 font-bold text-[11px] leading-tight"></div>
+        <button type="submit" id="btnAuthSubmit" class="w-full py-2.5 rounded bg-brand hover:bg-brand-dark text-white font-black text-xs uppercase tracking-wider shadow-xs transition">Sign In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. MAIN APP HEADER -->
+  <header id="mainAppHeader" class="hidden bg-white border-b border-corp-border sticky top-0 z-40 shadow-xs print:hidden">
+    <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="bg-brand text-white font-black text-xs px-2.5 py-1 rounded shadow-xs">MDS</div>
+        <div>
+          <h1 class="text-xs font-black uppercase tracking-wider text-corp-dark">Store Visit Audit</h1>
+          <p id="hdrStoreName" class="text-[11px] font-bold text-corp-muted leading-tight">-</p>
+        </div>
+      </div>
+
+      <nav class="flex bg-slate-100 p-1 rounded-lg border border-corp-border">
+        <button type="button" id="tabBtnChecklist" onclick="switchTab('checklist')" class="px-3 py-1 font-black text-xs text-brand bg-white rounded shadow-xs transition">Checklist</button>
+        <button type="button" id="tabBtnDashboard" onclick="switchTab('dashboard')" class="px-3 py-1 font-semibold text-xs text-corp-muted hover:text-corp-dark transition">Dashboard</button>
+        <button type="button" id="tabBtnResult" onclick="switchTab('result')" class="px-3 py-1 font-semibold text-xs text-corp-muted hover:text-corp-dark transition">Review</button>
+      </nav>
+
+      <div class="flex items-center space-x-3 text-right">
+        <!-- SELECTOR TRIAL KHUSUS NIK M223247 -->
+        <div id="trialRoleSelectorContainer" class="hidden border-r border-corp-border pr-3">
+          <select id="selTrialRole" onchange="switchTrialRole(this.value)" class="px-2 py-1 rounded border border-amber-300 bg-amber-50 text-amber-900 font-black text-[10px] focus:outline-hidden">
+            <option value="RM">Trial: Regional Manager (RM)</option>
+            <option value="SM">Trial: Store Manager (SM)</option>
+            <option value="ASM">Trial: Asst Store Manager (ASM)</option>
+            <option value="SA">Trial: Supervisor Area (SA)</option>
+          </select>
+        </div>
+
+        <div>
+          <span id="hdrUserName" class="text-xs font-black text-corp-dark block">-</span>
+          <span id="hdrUserRole" class="text-[10px] text-corp-muted block font-semibold">-</span>
+        </div>
+        <button type="button" onclick="executeSafeLogout()" class="px-3 py-1 rounded border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-900 font-bold text-xs shadow-xs transition">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 3. MAIN APPLICATION CONTAINER -->
+  <div id="mainAppContainer" class="hidden flex-1">
+
+    <!-- ==================== MODUL CHECKLIST ==================== -->
+    <main id="auditFormView" class="hidden max-w-4xl mx-auto px-4 py-5 space-y-4 print:hidden">
+      <div id="bannerTimeLock" class="hidden p-3 rounded border text-xs font-bold flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <span id="iconTimeLock" class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+          <span id="txtTimeLockStatus">Jam Operasional Walkthrough Aktif: 09.00 - 21.00 WIB</span>
+        </div>
+        <span id="lblCurrentHourWib" class="text-[10px] text-corp-muted font-mono font-bold">WIB</span>
+      </div>
+
+      <div class="bg-white p-4 rounded border border-corp-border shadow-xs space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-corp-border pb-3">
+          <div>
+            <h2 class="text-xs font-black uppercase tracking-wider text-corp-dark">Form Walkthrough Operasional</h2>
+            <p id="txtChecklistSubhead" class="text-[11px] text-corp-muted mt-0.5">Daftar evaluasi otomatis menyesuaikan Jabatan &amp; Frekuensi</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <div id="containerChecklistStoreSelect" class="hidden flex items-center space-x-1">
+              <span class="text-[10px] font-black uppercase text-brand">Kunjungan:</span>
+              <select id="selectAuditStore" class="px-2 py-1 rounded border border-brand bg-brand-surface font-bold text-xs text-corp-dark focus:outline-hidden"></select>
+            </div>
+
+            <div id="containerChecklistType">
+              <select id="selectChecklistType" onchange="syncChecklistControls()" class="px-2.5 py-1 rounded border border-corp-border bg-corp-surface font-bold text-xs text-corp-dark">
+                <option value="REGULAR">Regular Walkthrough</option>
+                <option value="OPENING">Opening Store</option>
+                <option value="CLOSING">Closing Store</option>
+              </select>
+            </div>
+
+            <div>
+              <select id="selectFrequency" onchange="syncChecklistControls()" class="px-2.5 py-1 rounded border border-corp-border bg-corp-surface font-bold text-xs text-corp-dark">
+                <option value="Daily">Daily Walkthrough</option>
+                <option value="Weekly">Weekly Walkthrough</option>
+                <option value="Monthly">Monthly Walkthrough</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="checklistQuestionsContainer" class="space-y-3">
+        <div class="bg-white p-6 rounded border border-corp-border text-center text-xs text-corp-muted">Menghubungkan butir evaluasi...</div>
+      </div>
+
+      <div class="bg-white p-3.5 rounded border border-corp-border shadow-xs space-y-2">
+        <label class="block text-[10px] font-black uppercase tracking-wider text-corp-muted">Catatan Keseluruhan Walkthrough</label>
+        <textarea id="txtGlobalNotes" rows="2" placeholder="Catatan kondisi toko..." class="w-full p-2.5 rounded border border-corp-border bg-corp-surface text-xs font-semibold text-corp-dark focus:bg-white focus:outline-hidden"></textarea>
+        
+        <div class="pt-2">
+          <button type="button" id="btnSubmitChecklist" onclick="handleChecklistSubmission()" class="w-full py-2.5 rounded bg-brand hover:bg-brand-dark text-white font-black text-xs uppercase tracking-wider shadow-xs transition">
+            Submit Laporan Walkthrough
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ==================== MODUL DASHBOARD ==================== -->
+    <main id="dashboardView" class="hidden max-w-7xl mx-auto px-4 py-5 space-y-4 print:hidden">
+      <div id="dashLoadingBar" class="hidden w-full bg-slate-200 h-1 overflow-hidden">
+        <div class="bg-brand h-full animate-pulse w-full"></div>
+      </div>
+
+      <!-- 1. TOOLBAR FILTER (DIPINDAHKAN KE ATAS) -->
+      <div class="bg-white p-3 rounded border border-corp-border shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="flex items-center space-x-1">
+            <span class="font-bold text-corp-muted">Toko:</span>
+            <select id="dashFilterStore" onchange="renderDashboardView()" class="px-2 py-1 rounded border border-corp-border bg-corp-surface font-semibold text-corp-dark">
+              <option value="ALL">Semua Unit Toko</option>
+            </select>
+          </div>
+          <div class="flex items-center space-x-1">
+            <span class="font-bold text-corp-muted">Tipe:</span>
+            <select id="dashFilterType" onchange="renderDashboardView()" class="px-2 py-1 rounded border border-corp-border bg-corp-surface font-semibold text-corp-dark">
+              <option value="ALL">Semua Tipe</option>
+              <option value="REGULAR">Regular Walkthrough</option>
+              <option value="OPENING">Opening Store</option>
+              <option value="CLOSING">Closing Store</option>
+            </select>
+          </div>
+          <div class="flex items-center space-x-1">
+            <span class="font-bold text-corp-muted">Frekuensi:</span>
+            <select id="dashFilterFrequency" onchange="renderDashboardView()" class="px-2 py-1 rounded border border-corp-border bg-corp-surface font-semibold text-corp-dark">
+              <option value="ALL">Semua Frekuensi</option>
+              <option value="Daily">Daily</option>
+              <option value="Weekly">Weekly</option>
+              <option value="Monthly">Monthly</option>
+            </select>
+          </div>
+          <div class="flex items-center space-x-1">
+            <span class="font-bold text-corp-muted">Status:</span>
+            <select id="dashFilterStatus" onchange="renderDashboardView()" class="px-2 py-1 rounded border border-corp-border bg-corp-surface font-semibold text-corp-dark">
+              <option value="ALL">Semua Status</option>
+              <option value="Completed">Completed</option>
+              <option value="Waiting Follow Up">Waiting Follow Up</option>
+              <option value="Waiting Approval">Waiting Approval</option>
+              <option value="Submitted">Submitted</option>
+            </select>
+          </div>
+          <div class="flex items-center space-x-1 border-l border-corp-border pl-2">
+            <input type="date" id="dashDateFrom" onchange="clearQuickPeriodActive(); renderDashboardView();" class="px-2 py-1 rounded border border-corp-border text-[11px]">
+            <span>s/d</span>
+            <input type="date" id="dashDateTo" onchange="clearQuickPeriodActive(); renderDashboardView();" class="px-2 py-1 rounded border border-corp-border text-[11px]">
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1">
+          <button type="button" id="btnPeriodToday" onclick="setDashboardQuickPeriod('TODAY')" class="px-2 py-1 rounded border font-bold text-[10px] transition">Hari Ini</button>
+          <button type="button" id="btnPeriodYesterday" onclick="setDashboardQuickPeriod('YESTERDAY')" class="px-2 py-1 rounded border font-bold text-[10px] transition">Kemarin</button>
+          <button type="button" id="btnPeriodLast7" onclick="setDashboardQuickPeriod('LAST7')" class="px-2 py-1 rounded border font-bold text-[10px] transition">7 Hari</button>
+          <button type="button" id="btnPeriodLast30" onclick="setDashboardQuickPeriod('LAST30')" class="px-2 py-1 rounded border font-bold text-[10px] transition">30 Hari</button>
+          <button type="button" onclick="setDashboardQuickPeriod('RESET')" class="px-2 py-1 rounded border font-bold text-[10px] text-corp-muted hover:bg-slate-50">Reset</button>
+          <button type="button" onclick="loadAllOperationalData()" class="px-3 py-1 rounded bg-brand text-white font-bold hover:bg-brand-dark transition text-[11px]">Refresh</button>
+        </div>
+      </div>
+
+      <!-- 2. ANALYTICS METRIC CARDS -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-white p-3.5 rounded border border-corp-border shadow-xs">
+          <span class="text-[10px] font-black uppercase text-corp-muted block">Rata-Rata Skor</span>
+          <h3 id="statAvgScore" class="text-2xl font-black text-corp-dark mt-1">0%</h3>
+        </div>
+        <div class="bg-white p-3.5 rounded border border-corp-border shadow-xs">
+          <span class="text-[10px] font-black uppercase text-corp-muted block">Total Walkthrough</span>
+          <h3 id="statTotalAudits" class="text-2xl font-black text-corp-dark mt-1">0</h3>
+        </div>
+        <div class="bg-white p-3.5 rounded border border-corp-border shadow-xs">
+          <span class="text-[10px] font-black uppercase text-corp-muted block">Defect / Temuan</span>
+          <h3 id="statTotalIssues" class="text-2xl font-black text-brand mt-1">0</h3>
+        </div>
+        <div class="bg-white p-3.5 rounded border border-corp-border shadow-xs">
+          <span class="text-[10px] font-black uppercase text-corp-muted block">Anomali Durasi (&lt; 5m)</span>
+          <h3 id="statSuspectFast" class="text-2xl font-black text-amber-600 mt-1">0</h3>
+        </div>
+      </div>
+
+      <!-- 3. STATUS BAR PROGRESS -->
+      <div class="bg-white p-3 rounded border border-corp-border shadow-xs space-y-2">
+        <div class="flex items-center justify-between text-xs">
+          <span class="font-black text-corp-dark uppercase text-[10px] tracking-wider">Distribusi Status Checklist</span>
+          <span id="txtChartSummary" class="text-[10px] font-bold text-corp-muted">0 Laporan</span>
+        </div>
+        <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex">
+          <div id="barCompleted" class="bg-emerald-600 h-full transition-all duration-300" style="width: 0%" title="Completed"></div>
+          <div id="barWaitingApproval" class="bg-amber-500 h-full transition-all duration-300" style="width: 0%" title="Waiting Approval"></div>
+          <div id="barWaitingFollowUp" class="bg-rose-500 h-full transition-all duration-300" style="width: 0%" title="Waiting Follow Up"></div>
+          <div id="barSubmitted" class="bg-slate-400 h-full transition-all duration-300" style="width: 0%" title="Submitted"></div>
+        </div>
+        <div class="flex flex-wrap items-center gap-4 text-[10px] font-bold pt-1">
+          <div class="flex items-center space-x-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+            <span class="text-corp-dark">Completed: <b id="lblCountCompleted">0</b></span>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+            <span class="text-corp-dark">Waiting Approval: <b id="lblCountWaitingApproval">0</b></span>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+            <span class="text-corp-dark">Waiting Follow Up: <b id="lblCountWaitingFollowUp">0</b></span>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+            <span class="text-corp-dark">Submitted: <b id="lblCountSubmitted">0</b></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. DUAL MATRICES: PER AUDITOR / TOKO & STORE COMPLIANCE -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
+        <!-- PERFORMA AUDITOR -->
+        <div class="bg-white rounded border border-corp-border shadow-xs overflow-hidden flex flex-col">
+          <div class="p-3 border-b border-corp-border flex flex-wrap items-center justify-between gap-2 bg-corp-surface">
+            <div class="flex items-center space-x-2">
+              <div class="flex bg-slate-200/80 p-0.5 rounded text-[11px] font-bold">
+                <button type="button" id="btnViewAuditor" onclick="switchPerformanceView('AUDITOR')" class="px-2.5 py-1 rounded bg-white text-brand shadow-xs">Per Auditor</button>
+                <button type="button" id="btnViewStore" onclick="switchPerformanceView('STORE')" class="px-2.5 py-1 rounded text-corp-muted hover:text-corp-dark">Per Toko</button>
+              </div>
+              <span id="txtPerformanceCounter" class="text-[10px] font-bold text-corp-muted hidden sm:inline">-</span>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-1.5 text-xs">
+              <select id="selAuditorStoreFilter" onchange="auditorCurrentPage=1; renderPerformanceMatrix();" class="px-2 py-1 rounded border border-corp-border bg-white text-[10px] font-bold">
+                <option value="ALL">Semua Toko</option>
+              </select>
+              <select id="selAuditorRoleFilter" onchange="auditorCurrentPage=1; renderPerformanceMatrix();" class="px-2 py-1 rounded border border-corp-border bg-white text-[10px] font-bold">
+                <option value="ALL">Semua Jabatan</option>
+              </select>
+              <select id="selAuditorStatusFilter" onchange="auditorCurrentPage=1; renderPerformanceMatrix();" class="px-2 py-1 rounded border border-corp-border bg-white text-[10px] font-bold">
+                <option value="ALL">Semua Status</option>
+                <option value="ACTIVE">Aktif (&ge; 1x)</option>
+                <option value="INACTIVE">Belum Mengerjakan</option>
+              </select>
+              <button type="button" onclick="exportAuditorPerformanceCsv()" class="px-2 py-1 rounded border border-corp-border bg-white text-corp-dark hover:bg-slate-50 font-bold text-[10px] shadow-xs">Export CSV</button>
+            </div>
+          </div>
+
+          <div class="h-[300px] overflow-y-auto flex-1">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead id="tblPerfHead" class="bg-slate-50 border-b border-corp-border text-corp-muted font-black text-[10px] uppercase sticky top-0 z-10"></thead>
+              <tbody id="tblPerfBody" class="divide-y divide-corp-border">
+                <tr><td colspan="5" class="p-6 text-center text-corp-muted">Memuat data performa...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- PAGINATION CONTROLS KHUSUS PER AUDITOR -->
+          <div id="auditorPaginationBar" class="hidden p-2 bg-slate-50 border-t border-corp-border flex items-center justify-between text-[11px]">
+            <span id="lblAuditorPaginationInfo" class="font-bold text-corp-muted">Halaman 1 dari 1</span>
+            <div class="flex items-center space-x-1">
+              <button type="button" id="btnPageFirst" onclick="changeAuditorPage('first')" class="px-2 py-0.5 rounded border border-corp-border bg-white font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">&laquo; First</button>
+              <button type="button" id="btnPagePrev" onclick="changeAuditorPage('prev')" class="px-2 py-0.5 rounded border border-corp-border bg-white font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">&lsaquo; Prev</button>
+              <button type="button" id="btnPageNext" onclick="changeAuditorPage('next')" class="px-2 py-0.5 rounded border border-corp-border bg-white font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">Next &rsaquo;</button>
+              <button type="button" id="btnPageLast" onclick="changeAuditorPage('last')" class="px-2 py-0.5 rounded border border-corp-border bg-white font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">Last &raquo;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- STORE COMPLIANCE (ISOLASI SM LEVEL TOKO) -->
+        <div class="bg-white rounded border border-corp-border shadow-xs overflow-hidden flex flex-col">
+          <div class="p-3 border-b border-corp-border flex items-center justify-between bg-corp-surface">
+            <span class="font-black text-corp-dark text-[11px] uppercase tracking-wider">STORE COMPLIANCE</span>
+            <span id="txtComplianceSummary" class="text-[10px] font-bold text-corp-muted">-</span>
+          </div>
+          <div class="h-[340px] overflow-y-auto flex-1">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-50 border-b border-corp-border text-corp-muted font-black text-[10px] uppercase sticky top-0 z-10">
+                <tr>
+                  <th class="p-2">Unit Toko</th>
+                  <th class="p-2 text-center">Opening</th>
+                  <th class="p-2 text-center">Regular</th>
+                  <th class="p-2 text-center">Closing</th>
+                  <th class="p-2 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody id="tblStoreComplianceBody" class="divide-y divide-corp-border">
+                <tr><td colspan="5" class="p-6 text-center text-corp-muted">Memuat data kepatuhan...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. TABEL HISTORI AUDIT -->
+      <div class="bg-white rounded border border-corp-border shadow-xs overflow-hidden">
+        <div class="p-3 border-b border-corp-border flex items-center justify-between bg-corp-surface">
+          <span class="font-black text-corp-dark text-[11px] uppercase tracking-wider">CHECKLIST REPORT HISTORY</span>
+          <span id="txtTableCounter" class="font-bold text-corp-muted text-[11px]">0 Laporan</span>
+        </div>
+        <div class="max-h-[500px] overflow-y-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="sticky top-0 z-10 bg-slate-100 shadow-xs border-b border-corp-border text-corp-muted font-black text-[10px] uppercase">
+              <tr>
+                <th class="p-2.5">Waktu (WIB)</th>
+                <th class="p-2.5">Toko</th>
+                <th class="p-2.5">Auditor</th>
+                <th class="p-2.5 text-center">Tipe</th>
+                <th class="p-2.5 text-center">Frekuensi</th>
+                <th class="p-2.5 text-center">Skor</th>
+                <th class="p-2.5 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody id="tblDashboardBody" class="divide-y divide-corp-border">
+              <tr><td colspan="7" class="p-8 text-center text-corp-muted">Memuat data histori...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- ==================== MODUL REVIEW (RESULT MASUKAN) ==================== -->
+    <main id="resultView" class="hidden max-w-7xl mx-auto px-4 py-5 space-y-4 print:hidden">
+      <div class="bg-white p-4 rounded border border-corp-border shadow-xs space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-corp-border pb-3">
+          <div>
+            <h2 class="text-xs font-black uppercase tracking-wider text-corp-dark">Daftar Temuan &amp; Tindak Lanjut Toko</h2>
+            <p class="text-[11px] text-corp-muted mt-0.5">Monitoring perbaikan fisik lapangan dan respon penanganan tiket</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="flex items-center space-x-1">
+              <span class="text-[10px] font-bold text-corp-muted uppercase">Toko:</span>
+              <select id="selResultStoreFilter" onchange="renderActionItemsTable()" class="px-2 py-1 rounded border border-corp-border bg-corp-surface font-bold text-xs text-corp-dark focus:outline-hidden">
+                <option value="ALL">Semua Unit Toko</option>
+              </select>
+            </div>
+
+            <div class="flex bg-slate-100 p-0.5 rounded border border-corp-border">
+              <button type="button" onclick="switchActionSubTab('ONGOING')" id="subTabOngoing" class="px-3 py-1 rounded bg-white shadow-xs text-brand font-black text-xs">
+                On-Going <span id="badgeOngoingCount" class="ml-1 px-1.5 py-0.2 bg-brand text-white text-[9px] rounded-full">0</span>
+              </button>
+              <button type="button" onclick="switchActionSubTab('ARCHIVED')" id="subTabArchived" class="px-3 py-1 rounded text-corp-muted font-bold text-xs">
+                Archived <span id="badgeArchivedCount" class="ml-1 px-1.5 py-0.2 bg-slate-400 text-white text-[9px] rounded-full">0</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+          <div class="p-2.5 rounded bg-corp-surface border border-corp-border flex items-center justify-between">
+            <span class="text-[10px] font-bold uppercase text-corp-muted">Total Temuan Aktif</span>
+            <span id="metricActiveIssues" class="text-base font-black text-corp-dark">0</span>
+          </div>
+          <div class="p-2.5 rounded bg-rose-50 border border-rose-200 flex items-center justify-between">
+            <span class="text-[10px] font-bold uppercase text-rose-900">Overdue (&gt;48 Jam)</span>
+            <span id="metricOverdueIssues" class="text-base font-black text-brand">0</span>
+          </div>
+          <div class="p-2.5 rounded bg-amber-50 border border-amber-200 flex items-center justify-between">
+            <span class="text-[10px] font-bold uppercase text-amber-900">Perlu Tindak Lanjut</span>
+            <span id="metricPendingFollowUp" class="text-base font-black text-amber-700">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded border border-corp-border shadow-xs overflow-hidden">
+        <div class="max-h-[600px] overflow-y-auto">
+          <table class="w-full text-left border-collapse text-xs table-fixed">
+            <thead class="sticky top-0 z-10 bg-slate-100 border-b border-corp-border text-corp-muted font-black text-[10px] uppercase">
+              <tr>
+                <th class="p-2.5 w-[14%]">Waktu &amp; ID</th>
+                <th class="p-2.5 w-[20%]">Unit Toko &amp; Auditor</th>
+                <th class="p-2.5 w-[38%]">Temuan &amp; Action Plan</th>
+                <th class="p-2.5 w-[12%] text-center">Status &amp; SLA</th>
+                <th id="thActionHeader" class="p-2.5 w-[16%] text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tblActionItemsBody" class="divide-y divide-corp-border">
+              <tr><td colspan="5" class="p-8 text-center text-corp-muted">Memuat data temuan...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- MODAL TINDAK LANJUT / REMINDER -->
+      <div id="modalActionFollowUp" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl border border-corp-border shadow-2xl max-w-md w-full p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-corp-border pb-3">
+            <h3 id="modalTitle" class="text-xs font-black uppercase tracking-wider text-corp-dark">Tindak Lanjut Temuan</h3>
+            <button type="button" onclick="closeFollowUpModal()" class="text-corp-muted hover:text-corp-dark font-black text-sm">✕</button>
+          </div>
+
+          <div class="space-y-2 text-xs">
+            <div>
+              <span class="text-[10px] font-bold text-corp-muted block">ID Tiket &amp; Toko</span>
+              <span id="modalMetaInfo" class="font-bold text-corp-dark block">-</span>
+            </div>
+            <div>
+              <span class="text-[10px] font-bold text-corp-muted block">Uraian SOP</span>
+              <p id="modalSopText" class="font-semibold text-corp-dark text-[11px] leading-tight">-</p>
+            </div>
+            <div class="p-2.5 rounded bg-rose-50 border border-rose-200">
+              <span class="text-[9px] font-black uppercase text-rose-900 block">Issue Lapangan:</span>
+              <p id="modalIssueText" class="text-[11px] font-semibold text-rose-950 mt-0.5">-</p>
+            </div>
+
+            <div id="containerModalInput">
+              <label class="block font-black uppercase text-[10px] text-corp-muted mb-1">Catatan Realisasi Perbaikan *</label>
+              <textarea id="txtFollowUpNotes" rows="3" placeholder="Jelaskan tindakan perbaikan yang telah dikerjakan di toko..." class="w-full p-2 rounded border border-corp-border bg-corp-surface text-xs font-semibold focus:bg-white focus:outline-hidden"></textarea>
+              
+              <div class="mt-2">
+                <label class="block font-black uppercase text-[10px] text-corp-muted mb-1">Update Status Tiket</label>
+                <select id="selFollowUpStatus" class="w-full p-2 rounded border border-corp-border bg-corp-surface font-bold text-xs text-corp-dark">
+                  <option value="In Progress">In Progress</option>
+                  <option value="Archived">Archived (Selesai)</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="containerModalReminder" class="hidden p-3 rounded bg-amber-50 border border-amber-200 text-amber-950 text-xs">
+              Apakah Anda ingin mengirimkan pengingat (*reminder*) resmi kepada Store Manager terkait penyelesaian temuan ini?
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end space-x-2 pt-2 border-t border-corp-border">
+            <button type="button" onclick="closeFollowUpModal()" class="px-3 py-1.5 rounded border border-corp-border text-corp-muted font-bold text-xs">Batal</button>
+            <button type="button" id="btnSubmitModalAction" onclick="submitModalActionFollowUp()" class="px-4 py-1.5 rounded bg-brand hover:bg-brand-dark text-white font-black text-xs shadow-xs transition">Simpan</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 4. CORE CONTROLLER SCRIPT (DUAL-MODE & ENHANCED FEATURES) -->
+  <script>
+    // MASUKKAN URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI
+    var GAS_API_URL = "https://script.google.com/macros/s/AKfycb.../exec";
+
+    var currentUser = null;
+    var masterData = { stores: [], questions: [], brands: [], divisions: [] };
+    var rawReports = [];
+    var rawActionItems = [];
+    var masterEmployees = [];
+    
+    var currentPerfView = "AUDITOR";
+    var currentActivePeriod = "TODAY"; // Default: TODAY
+    
+    // VARIABEL PAGINATION & SORTING AUDITOR
+    var auditorCurrentPage = 1;
+    var auditorPageSize = 10;
+    var auditorSortColumn = "count"; // Default sort: total kunjungan
+    var auditorSortAsc = false; // Descending
+    
+    var activeQuestions = [];
+    var formAnswers = {};
+    var currentActionSubTab = "ONGOING";
+    var selectedModalActionId = null;
+
+    // JEMBATAN API DUAL-MODE
+    function executeApiCall(actionName, payloadObj, onSuccess, onError) {
+      if (typeof google === "undefined" || !google.script || !google.script.run) {
+        var reqPayload = Object.assign({ action: actionName }, payloadObj || {});
+        fetch(GAS_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(reqPayload)
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (typeof onSuccess === "function") onSuccess(data);
+        })
+        .catch(function(err) {
+          console.error("API Fetch Error (" + actionName + "):", err);
+          if (typeof onError === "function") onError(err);
+        });
+      } else {
+        var runner = google.script.run
+          .withSuccessHandler(onSuccess)
+          .withFailureHandler(onError);
+
+        if (actionName === "verifyLogin") runner.verifyLoginCredentials(payloadObj.userId, payloadObj.password);
+        else if (actionName === "getMasterData") runner.getMasterData();
+        else if (actionName === "getReports") runner.getHistoricalReports(payloadObj.role, payloadObj.siteCode, payloadObj.region, payloadObj.userId);
+        else if (actionName === "submitAudit") runner.submitAuditWalkthrough(payloadObj.payload);
+        else if (actionName === "updateAction") runner.updateActionItemRecord(payloadObj.actionId, payloadObj.newStatus, payloadObj.notes, payloadObj.isReminder, payloadObj.storeCode, payloadObj.role);
+        else if (actionName === "deleteAction") runner.deleteActionItemRecord(payloadObj.actionId, payloadObj.role);
+      }
+    }
+
+    function switchTab(tabName) {
+      try {
+        var viewForm = document.getElementById("auditFormView");
+        var viewDash = document.getElementById("dashboardView");
+        var viewResult = document.getElementById("resultView");
+
+        var btnChecklist = document.getElementById("tabBtnChecklist");
+        var btnDashboard = document.getElementById("tabBtnDashboard");
+        var btnResult = document.getElementById("tabBtnResult");
+
+        if (viewForm) viewForm.classList.add("hidden");
+        if (viewDash) viewDash.classList.add("hidden");
+        if (viewResult) viewResult.classList.add("hidden");
+
+        var inactCls = "px-3 py-1 font-semibold text-xs text-corp-muted hover:text-corp-dark transition";
+        var actCls = "px-3 py-1 font-black text-xs text-brand bg-white rounded shadow-xs transition";
+
+        if (btnChecklist) btnChecklist.className = inactCls;
+        if (btnDashboard) btnDashboard.className = inactCls;
+        if (btnResult) btnResult.className = inactCls;
+
+        if (tabName === 'checklist') {
+          if (viewForm) viewForm.classList.remove("hidden");
+          if (btnChecklist) btnChecklist.className = actCls;
+          syncChecklistControls();
+        } else if (tabName === 'dashboard') {
+          if (viewDash) viewDash.classList.remove("hidden");
+          if (btnDashboard) btnDashboard.className = actCls;
+          renderDashboardView();
+        } else if (tabName === 'result') {
+          if (viewResult) viewResult.classList.remove("hidden");
+          if (btnResult) btnResult.className = actCls;
+          renderActionItemsTable();
+        }
+      } catch (err) {
+        console.error("Gagal switchTab:", err);
+      }
+    }
+
+    function executeAppLogin(e) {
+      e.preventDefault();
+      var idVal = document.getElementById("inputAuthId").value.trim();
+      var pinVal = document.getElementById("inputAuthPin").value.trim();
+      var btn = document.getElementById("btnAuthSubmit");
+      var errEl = document.getElementById("authErrorMsg");
+
+      btn.disabled = true;
+      btn.innerText = "Memverifikasi...";
+      errEl.classList.add("hidden");
+
+      executeApiCall("verifyLogin", { userId: idVal, password: pinVal }, function(res) {
+        btn.disabled = false;
+        btn.innerText = "Sign In";
+        if (res && res.success) {
+          currentUser = res.user;
+          try { localStorage.setItem("MDS_AUDIT_USER", JSON.stringify(currentUser)); } catch(e){}
+          setupUserSession();
+        } else {
+          errEl.innerText = res ? res.message : "ID atau PIN salah.";
+          errEl.classList.remove("hidden");
+        }
+      }, function(err) {
+        btn.disabled = false;
+        btn.innerText = "Sign In";
+        errEl.innerText = "Koneksi server gagal: " + err.toString();
+        errEl.classList.remove("hidden");
+      });
+    }
+
+    function setupUserSession() {
+      if (!currentUser) return;
+      document.getElementById("fullAuthScreen").classList.add("hidden");
+      document.getElementById("mainAppHeader").classList.remove("hidden");
+      document.getElementById("mainAppContainer").classList.remove("hidden");
+
+      document.getElementById("hdrUserName").innerText = currentUser.name;
+      document.getElementById("hdrUserRole").innerText = currentUser.jobTitle + " • " + currentUser.id;
+      document.getElementById("hdrStoreName").innerText = (currentUser.storeCode && currentUser.storeCode !== "ALL") 
+        ? "Toko " + currentUser.storeCode 
+        : "Regional Fleet (All Stores)";
+
+      var trialContainer = document.getElementById("trialRoleSelectorContainer");
+      if (currentUser.id && currentUser.id.toUpperCase() === "M223247") {
+        if (trialContainer) trialContainer.classList.remove("hidden");
+        var selTrial = document.getElementById("selTrialRole");
+        if (selTrial) selTrial.value = currentUser.role || "RM";
+      } else {
+        if (trialContainer) trialContainer.classList.add("hidden");
+      }
+
+      // KUNCI DEFAULT FILTER HARI INI
+      setDashboardQuickPeriod('TODAY', false);
+
+      executeApiCall("getMasterData", {}, function(res) {
+        if (res) {
+          masterData = res;
+          syncChecklistControls();
+          loadAllOperationalData();
+          switchTab('dashboard');
+        }
+      });
+    }
+
+    function switchTrialRole(newRole) {
+      if (!currentUser || currentUser.id.toUpperCase() !== "M223247") return;
+      currentUser.role = newRole;
+      var jobMap = { "RM": "REGIONAL MANAGER", "SM": "STORE MANAGER", "ASM": "ASSISTANT STORE MANAGER", "SA": "SUPERVISOR AREA" };
+      currentUser.jobTitle = jobMap[newRole] || newRole;
+      document.getElementById("hdrUserRole").innerText = currentUser.jobTitle + " • " + currentUser.id;
+      syncChecklistControls();
+      loadAllOperationalData();
+    }
+
+    function executeSafeLogout() {
+      try { localStorage.removeItem("MDS_AUDIT_USER"); } catch(e){}
+      currentUser = null;
+      document.getElementById("inputAuthId").value = "";
+      document.getElementById("inputAuthPin").value = "";
+      document.getElementById("authErrorMsg").classList.add("hidden");
+      document.getElementById("mainAppHeader").classList.add("hidden");
+      document.getElementById("mainAppContainer").classList.add("hidden");
+      document.getElementById("fullAuthScreen").classList.remove("hidden");
+    }
+
+    // CHECKLIST & TIME-LOCK
+    function checkStoreOperationalHours() {
+      var now = new Date();
+      var utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      var wibDate = new Date(utc + (3600000 * 7));
+      var curHour = wibDate.getHours();
+      var curMinute = wibDate.getMinutes();
+
+      var curRole = (currentUser && currentUser.role) ? currentUser.role : "SA";
+      var cTypeSelect = document.getElementById("selectChecklistType");
+      var curType = cTypeSelect ? cTypeSelect.value.trim().toUpperCase() : "REGULAR";
+
+      var banner = document.getElementById("bannerTimeLock");
+      var icon = document.getElementById("iconTimeLock");
+      var txtStatus = document.getElementById("txtTimeLockStatus");
+      var lblClock = document.getElementById("lblCurrentHourWib");
+      var btn = document.getElementById("btnSubmitChecklist");
+
+      var timeStr = (curHour < 10 ? '0' + curHour : curHour) + '.' + (curMinute < 10 ? '0' + curMinute : curMinute) + ' WIB';
+      if (lblClock) lblClock.innerText = timeStr;
+      if (banner) banner.classList.remove("hidden");
+
+      if (curRole === "RM" || curRole === "ADMIN") {
+        if (banner) banner.className = "p-3 rounded border bg-slate-50 border-slate-200 text-slate-800 text-xs font-bold flex items-center justify-between";
+        if (icon) icon.className = "w-2.5 h-2.5 rounded-full bg-slate-600";
+        if (txtStatus) txtStatus.innerText = "Mode Supervisi: Akses Walkthrough Bebas Waktu (RM/Admin)";
+        if (btn) { btn.disabled = false; btn.classList.remove("opacity-50", "cursor-not-allowed"); }
+        return true;
+      }
+
+      if (curType === "OPENING" || curType === "CLOSING") {
+        if (banner) banner.className = "p-3 rounded border bg-blue-50 border-blue-200 text-blue-900 text-xs font-bold flex items-center justify-between";
+        if (icon) icon.className = "w-2.5 h-2.5 rounded-full bg-blue-600";
+        if (txtStatus) txtStatus.innerText = "Akses Khusus Persiapan: Checklist " + curType;
+        if (btn) { btn.disabled = false; btn.classList.remove("opacity-50", "cursor-not-allowed"); }
+        return true;
+      }
+
+      if (curHour >= 9 && curHour < 21) {
+        if (banner) banner.className = "p-3 rounded border bg-emerald-50 border-emerald-200 text-emerald-900 text-xs font-bold flex items-center justify-between";
+        if (icon) icon.className = "w-2.5 h-2.5 rounded-full bg-emerald-600";
+        if (txtStatus) txtStatus.innerText = "Jam Operasional Walkthrough Aktif: 09.00 - 21.00 WIB";
+        if (btn) { btn.disabled = false; btn.classList.remove("opacity-50", "cursor-not-allowed"); }
+        return true;
+      } else {
+        if (banner) banner.className = "p-3 rounded border bg-rose-50 border-rose-200 text-rose-900 text-xs font-bold flex items-center justify-between";
+        if (icon) icon.className = "w-2.5 h-2.5 rounded-full bg-rose-600";
+        if (txtStatus) txtStatus.innerText = "Walkthrough Reguler Terkunci (Hanya Aktif Pukul 09.00 - 21.00 WIB)";
+        if (btn) { btn.disabled = true; btn.classList.add("opacity-50", "cursor-not-allowed"); }
+        return false;
+      }
+    }
+
+    function syncChecklistControls() {
+      if (!masterData.questions || masterData.questions.length === 0) return;
+
+      var curRole = (currentUser && currentUser.role) ? currentUser.role : "SA";
+      var cStoreContainer = document.getElementById("containerChecklistStoreSelect");
+      var cTypeContainer = document.getElementById("containerChecklistType");
+      var cTypeSelect = document.getElementById("selectChecklistType");
+      var freqSelect = document.getElementById("selectFrequency");
+
+      if (curRole === "RM" || (currentUser && currentUser.storeCode === "ALL")) {
+        if (cStoreContainer) {
+          cStoreContainer.classList.remove("hidden");
+          populateChecklistStoreDropdown();
+        }
+        if (cTypeContainer) cTypeContainer.classList.add("hidden");
+        if (cTypeSelect) cTypeSelect.value = "REGULAR";
+      } else {
+        if (cStoreContainer) cStoreContainer.classList.add("hidden");
+        if (cTypeContainer) cTypeContainer.classList.remove("hidden");
+      }
+
+      var selectedType = cTypeSelect ? cTypeSelect.value.trim().toUpperCase() : "REGULAR";
+      var curFreq = freqSelect ? freqSelect.value.trim().toLowerCase() : "daily";
+
+      activeQuestions = masterData.questions.filter(function(q) {
+        var itemType = String(q.checklistType || "REGULAR").trim().toUpperCase();
+        var qReqRole = String(q.requiredRole || "").toUpperCase().trim();
+        var qFreq = String(q.frequency || "Daily").trim().toLowerCase();
+
+        if (selectedType === "OPENING") {
+          return (itemType === "OPENING");
+        } else if (selectedType === "CLOSING") {
+          return (itemType === "CLOSING");
+        } else {
+          if (itemType === "OPENING" || itemType === "CLOSING") return false;
+          var freqMatch = (qFreq === curFreq);
+          var roleMatch = (qReqRole === "ALL" || qReqRole.indexOf(curRole) !== -1);
+          return roleMatch && freqMatch;
+        }
+      });
+
+      checkStoreOperationalHours();
+      renderQuestionsUI();
+    }
+
+    function populateChecklistStoreDropdown() {
+      var select = document.getElementById("selectAuditStore");
+      if (!select || !masterData.stores || select.options.length > 0) return;
+      masterData.stores.forEach(function(s) {
+        var opt = document.createElement("option");
+        opt.value = s.siteCode;
+        opt.innerText = s.siteCode + " - " + s.siteName;
+        select.appendChild(opt);
+      });
+    }
+
+    function renderQuestionsUI() {
+      var container = document.getElementById("checklistQuestionsContainer");
+      if (!container) return;
+
+      var cTypeSelect = document.getElementById("selectChecklistType");
+      var curType = cTypeSelect ? cTypeSelect.value : "REGULAR";
+
+      if (activeQuestions.length === 0) {
+        container.innerHTML = '<div class="bg-white p-6 rounded border border-corp-border text-center text-xs text-corp-muted">' +
+          'Tidak ada butir evaluasi terdaftar untuk tipe <b>' + curType + '</b>.' +
+          '</div>';
+        return;
+      }
+
+      var htmlContent = "";
+      for (var idx = 0; idx < activeQuestions.length; idx++) {
+        var q = activeQuestions[idx];
+        var ans = formAnswers[q.id] || { status: null, issue: '', actionPlan: '', photo: '' };
+        var isPass = (ans.status === 'Pass');
+        var isFail = (ans.status === 'Fail');
+
+        htmlContent += '<div class="bg-white p-3.5 rounded border border-corp-border shadow-xs space-y-2.5">' +
+          '<div class="flex items-start justify-between gap-2">' +
+            '<div>' +
+              '<span class="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-corp-muted">' + q.category + ' (' + q.id + ')</span>' +
+              '<h4 class="text-xs font-bold text-corp-dark mt-1">' + (idx + 1) + '. ' + q.text + '</h4>' +
+            '</div>' +
+          '</div>' +
+          '<div class="grid grid-cols-2 gap-2 pt-1">' +
+            '<button type="button" onclick="setAnswer(\'' + q.id + '\', \'Pass\')" class="py-2 rounded font-bold text-xs border ' + (isPass ? 'bg-emerald-700 text-white' : 'bg-slate-50 text-corp-muted border-corp-border') + '">Pass</button>' +
+            '<button type="button" onclick="setAnswer(\'' + q.id + '\', \'Fail\')" class="py-2 rounded font-bold text-xs border ' + (isFail ? 'bg-brand text-white' : 'bg-slate-50 text-corp-muted border-corp-border') + '">Fail</button>' +
+          '</div>' +
+          '<div class="' + (isFail ? 'block' : 'hidden') + ' p-3 rounded bg-rose-50 border border-rose-200 space-y-2.5 text-xs">' +
+            '<div>' +
+              '<label class="block font-black text-[10px] uppercase text-rose-900 mb-1">1. Uraian Temuan Kerusakan / Issue *</label>' +
+              '<input type="text" id="issue_' + q.id + '" value="' + (ans.issue || '') + '" oninput="updateFailData(\'' + q.id + '\', \'issue\')" placeholder="Jelaskan detail ketidaksesuaian..." class="w-full p-2 rounded border border-rose-200 bg-white font-semibold text-rose-950 focus:outline-hidden">' +
+            '</div>' +
+            '<div>' +
+              '<label class="block font-black text-[10px] uppercase text-rose-900 mb-1">2. Rencana Tindakan Perbaikan / Action Plan *</label>' +
+              '<input type="text" id="plan_' + q.id + '" value="' + (ans.actionPlan || '') + '" oninput="updateFailData(\'' + q.id + '\', \'actionPlan\')" placeholder="Tindakan korektif yang wajib dilakukan..." class="w-full p-2 rounded border border-rose-200 bg-white font-semibold text-rose-950 focus:outline-hidden">' +
+            '</div>' +
+            '<div>' +
+              '<label class="block font-black text-[10px] uppercase text-rose-900 mb-1">3. Foto Bukti Temuan</label>' +
+              '<input type="file" id="photo_' + q.id + '" accept="image/*" capture="environment" onchange="handlePhotoUpload(\'' + q.id + '\')" class="w-full text-[11px] text-rose-950 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[10px] file:font-black file:bg-rose-200 file:text-rose-900 hover:file:bg-rose-300">' +
+              (ans.photo ? '<div class="mt-1 text-[10px] font-bold text-emerald-800">✓ Foto berhasil dipilih</div>' : '') +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }
+      container.innerHTML = htmlContent;
+    }
+
+    function setAnswer(qId, status) {
+      if (!formAnswers[qId]) formAnswers[qId] = { status: null, issue: '', actionPlan: '', photo: '' };
+      formAnswers[qId].status = status;
+      renderQuestionsUI();
+    }
+
+    function updateFailData(qId, field) {
+      var el = document.getElementById(field + '_' + qId);
+      if (!formAnswers[qId]) formAnswers[qId] = { status: 'Fail', issue: '', actionPlan: '', photo: '' };
+      if (el) formAnswers[qId][field] = el.value;
+    }
+
+    function handlePhotoUpload(qId) {
+      var fileInput = document.getElementById('photo_' + qId);
+      if (fileInput && fileInput.files && fileInput.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          if (!formAnswers[qId]) formAnswers[qId] = { status: 'Fail', issue: '', actionPlan: '', photo: '' };
+          formAnswers[qId].photo = e.target.result;
+          renderQuestionsUI();
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+      }
+    }
+
+    function handleChecklistSubmission() {
+      if (!checkStoreOperationalHours()) {
+        alert("Pengiriman Regular Walkthrough hanya diizinkan pada jam operasional 09.00 - 21.00 WIB!");
+        return;
+      }
+
+      var btn = document.getElementById("btnSubmitChecklist");
+      var unans = [];
+      var invalidFails = [];
+      var answersPayload = [];
+
+      for (var i = 0; i < activeQuestions.length; i++) {
+        var q = activeQuestions[i];
+        var a = formAnswers[q.id];
+
+        if (!a || !a.status) {
+          unans.push(q.id);
+        } else {
+          if (a.status === 'Fail') {
+            var elIssue = document.getElementById('issue_' + q.id);
+            var elPlan = document.getElementById('plan_' + q.id);
+            var curIssue = (elIssue && elIssue.value.trim()) ? elIssue.value.trim() : (a.issue || "").trim();
+            var curPlan = (elPlan && elPlan.value.trim()) ? elPlan.value.trim() : (a.actionPlan || "").trim();
+            a.issue = curIssue;
+            a.actionPlan = curPlan;
+            if (!curIssue || !curPlan) invalidFails.push(q.id);
+          }
+
+          answersPayload.push({
+            questionId: q.id,
+            questionText: q.text,
+            status: a.status,
+            issue: a.issue || '',
+            actionPlan: a.actionPlan || '',
+            photoBase64: a.photo || ''
+          });
+        }
+      }
+
+      if (unans.length > 0) {
+        alert("Masih ada " + unans.length + " butir pertanyaan yang belum diisi statusnya!");
+        return;
+      }
+
+      if (invalidFails.length > 0) {
+        alert("Butir " + invalidFails.join(", ") + " berstatus FAIL namun [Issue] atau [Action Plan] masih kosong!");
+        return;
+      }
+
+      var curRole = (currentUser && currentUser.role) ? currentUser.role : "RM";
+      var auditSiteCode = (currentUser && currentUser.storeCode !== "ALL") ? currentUser.storeCode : "272";
+      if (curRole === "RM" || (currentUser && currentUser.storeCode === "ALL")) {
+        var elSelStore = document.getElementById("selectAuditStore");
+        if (elSelStore && elSelStore.value) auditSiteCode = elSelStore.value;
+      }
+
+      btn.disabled = true;
+      btn.innerText = "Mengirim Laporan...";
+
+      var payload = {
+        siteCode: auditSiteCode,
+        auditorName: currentUser ? currentUser.name : "Auditor",
+        auditorRole: curRole,
+        frequency: document.getElementById("selectFrequency").value,
+        checklistType: document.getElementById("selectChecklistType") ? document.getElementById("selectChecklistType").value : "REGULAR",
+        notes: document.getElementById("txtGlobalNotes").value,
+        answers: answersPayload
+      };
+
+      executeApiCall("submitAudit", { payload: payload }, function(res) {
+        btn.disabled = false;
+        btn.innerText = "Submit Laporan Walkthrough";
+        if (res && res.success) {
+          alert("Laporan Walkthrough berhasil dikirim dengan skor: " + res.score);
+          formAnswers = {};
+          renderQuestionsUI();
+          loadAllOperationalData();
+          switchTab('dashboard');
+        } else {
+          alert("Gagal submit: " + (res ? res.message : "Error"));
+        }
+      }, function(err) {
+        btn.disabled = false;
+        btn.innerText = "Submit Laporan Walkthrough";
+        alert("Koneksi gagal: " + err.toString());
+      });
+    }
+
+    // DASHBOARD & ANALYTICS
+    function formatWibDisplay(ts) {
+      if (!ts) return "-";
+      try {
+        var cleanStr = String(ts).replace('T', ' ').replace('Z', '').split('.')[0];
+        var parts = cleanStr.split(' ');
+        if (parts.length >= 2) {
+          var dateParts = parts[0].split('-');
+          var timeParts = parts[1].split(':');
+          if (dateParts.length === 3 && timeParts.length >= 2) {
+            var monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+            var day = parseInt(dateParts[2], 10);
+            var monthIdx = parseInt(dateParts[1], 10) - 1;
+            var hh = timeParts[0];
+            var mm = timeParts[1];
+            return day + " " + (monthNames[monthIdx] || dateParts[1]) + " • " + hh + "." + mm + " WIB";
+          }
+        }
+        return ts;
+      } catch(e) { return ts; }
+    }
+
+    function normalizeScoreNum(val) {
+      if (val === null || val === undefined) return 0;
+      var num = parseFloat(String(val).replace("%", "").trim());
+      if (isNaN(num)) return 0;
+      if (num > 0 && num <= 1) return Math.round(num * 100);
+      return Math.round(num);
+    }
+
+    function switchPerformanceView(v) {
+      currentPerfView = v;
+      var bA = document.getElementById("btnViewAuditor");
+      var bS = document.getElementById("btnViewStore");
+      if (v === "AUDITOR") {
+        if (bA) bA.className = "px-2.5 py-1 rounded bg-white text-brand shadow-xs";
+        if (bS) bS.className = "px-2.5 py-1 rounded text-corp-muted hover:text-corp-dark";
+      } else {
+        if (bS) bS.className = "px-2.5 py-1 rounded bg-white text-brand shadow-xs";
+        if (bA) bA.className = "px-2.5 py-1 rounded text-corp-muted hover:text-corp-dark";
+      }
+      auditorCurrentPage = 1;
+      renderPerformanceMatrix();
+    }
+
+    function loadAllOperationalData() {
+      var loadingBar = document.getElementById("dashLoadingBar");
+      if (loadingBar) loadingBar.classList.remove("hidden");
+
+      var role = (currentUser && currentUser.role) ? currentUser.role : "RM";
+      var uid = (currentUser && currentUser.id) ? currentUser.id : "";
+      var store = (currentUser && currentUser.storeCode) ? currentUser.storeCode : "ALL";
+
+      executeApiCall("getReports", { role: role, siteCode: store, region: "", userId: uid }, function(res) {
+        if (loadingBar) loadingBar.classList.add("hidden");
+        if (res) {
+          rawReports = res.reports || [];
+          rawActionItems = res.actionItems || [];
+          masterEmployees = res.employees || [];
+          populateStoreOptions();
+          populateJobTitleFilterOptions();
+          populateAuditorStoreFilterOptions();
+          renderDashboardView();
+          renderActionItemsTable();
+        }
+      }, function(err) {
+        if (loadingBar) loadingBar.classList.add("hidden");
+        console.error("Gagal load data:", err);
+      });
+    }
+
+    function getFilteredReports() {
+      var elFrom = document.getElementById("dashDateFrom");
+      var elTo = document.getElementById("dashDateTo");
+      var elType = document.getElementById("dashFilterType");
+      var elFreq = document.getElementById("dashFilterFrequency");
+      var elStore = document.getElementById("dashFilterStore");
+      var elStatus = document.getElementById("dashFilterStatus");
+
+      var fFrom = elFrom ? elFrom.value : "";
+      var fTo = elTo ? elTo.value : "";
+      var fType = elType ? elType.value : "ALL";
+      var fFreq = elFreq ? elFreq.value : "ALL";
+      var fStore = elStore ? elStore.value : "ALL";
+      var fStatus = elStatus ? elStatus.value : "ALL";
+
+      return (rawReports || []).filter(function(r) {
+        if (!r) return false;
+        var rDate = String(r.timestamp || "").substring(0, 10);
+        if (fFrom && rDate && rDate < fFrom) return false;
+        if (fTo && rDate && rDate > fTo) return false;
+        if (fType !== "ALL" && String(r.checklistType || "REGULAR").toUpperCase() !== fType) return false;
+        if (fFreq !== "ALL" && String(r.frequency || "").toLowerCase() !== fFreq.toLowerCase()) return false;
+        if (fStore !== "ALL" && String(r.siteCode) !== fStore) return false;
+        if (fStatus !== "ALL" && String(r.processStatus || "").toLowerCase() !== fStatus.toLowerCase()) return false;
+        return true;
+      });
+    }
+
+    function renderDashboardView() {
+      var filtered = getFilteredReports();
+      var sumScore = 0, issues = 0, fast = 0;
+      filtered.forEach(function(r) {
+        sumScore += normalizeScoreNum(r.score);
+        issues += (Number(r.totalNo) || 0);
+        if (String(r.paceFlag || '').indexOf('SUSPECT_FAST') !== -1) fast++;
+      });
+
+      var sAvg = document.getElementById("statAvgScore");
+      var sTot = document.getElementById("statTotalAudits");
+      var sIss = document.getElementById("statTotalIssues");
+      var sFst = document.getElementById("statSuspectFast");
+
+      if (sAvg) sAvg.innerText = (filtered.length > 0 ? Math.round(sumScore / filtered.length) : 0) + "%";
+      if (sTot) sTot.innerText = filtered.length;
+      if (sIss) sIss.innerText = issues;
+      if (sFst) sFst.innerText = fast;
+
+      renderStatusProgressChart(filtered);
+      renderPerformanceMatrix();
+      renderStoreCompliance();
+      renderHistoryTable(filtered);
+    }
+
+    function renderStatusProgressChart(filtered) {
+      var cComp = 0, cAppr = 0, cFollow = 0, cSubm = 0;
+      var total = filtered.length;
+
+      filtered.forEach(function(r) {
+        var st = String(r.processStatus || "").toLowerCase();
+        if (st.indexOf("completed") !== -1 || st.indexOf("selesai") !== -1 || st.indexOf("approved") !== -1) cComp++;
+        else if (st.indexOf("waiting approval") !== -1) cAppr++;
+        else if (st.indexOf("waiting follow up") !== -1 || st.indexOf("action") !== -1) cFollow++;
+        else cSubm++;
+      });
+
+      var pComp = total > 0 ? (cComp / total) * 100 : 0;
+      var pAppr = total > 0 ? (cAppr / total) * 100 : 0;
+      var pFollow = total > 0 ? (cFollow / total) * 100 : 0;
+      var pSubm = total > 0 ? (cSubm / total) * 100 : 0;
+
+      var bComp = document.getElementById("barCompleted");
+      var bAppr = document.getElementById("barWaitingApproval");
+      var bFollow = document.getElementById("barWaitingFollowUp");
+      var bSubm = document.getElementById("barSubmitted");
+
+      if (bComp) bComp.style.width = pComp + "%";
+      if (bAppr) bAppr.style.width = pAppr + "%";
+      if (bFollow) bFollow.style.width = pFollow + "%";
+      if (bSubm) bSubm.style.width = pSubm + "%";
+
+      var lComp = document.getElementById("lblCountCompleted");
+      var lAppr = document.getElementById("lblCountWaitingApproval");
+      var lFollow = document.getElementById("lblCountWaitingFollowUp");
+      var lSubm = document.getElementById("lblCountSubmitted");
+      var sumTxt = document.getElementById("txtChartSummary");
+
+      if (lComp) lComp.innerText = cComp;
+      if (lAppr) lAppr.innerText = cAppr;
+      if (lFollow) lFollow.innerText = cFollow;
+      if (lSubm) lSubm.innerText = cSubm;
+      if (sumTxt) sumTxt.innerText = total + " Laporan";
+    }
+
+    // SORTING & PAGINATION MATRIX AUDITOR
+    function setAuditorSort(colName) {
+      if (auditorSortColumn === colName) {
+        auditorSortAsc = !auditorSortAsc;
+      } else {
+        auditorSortColumn = colName;
+        auditorSortAsc = (colName === "name" || colName === "siteCode");
+      }
+      renderPerformanceMatrix();
+    }
+
+    function changeAuditorPage(dir) {
+      if (dir === 'first') auditorCurrentPage = 1;
+      else if (dir === 'prev') auditorCurrentPage = Math.max(1, auditorCurrentPage - 1);
+      else if (dir === 'next') auditorCurrentPage++;
+      else if (dir === 'last') auditorCurrentPage = 999999;
+      renderPerformanceMatrix();
+    }
+
+    function renderPerformanceMatrix() {
+      var thead = document.getElementById("tblPerfHead");
+      var tbody = document.getElementById("tblPerfBody");
+      var counterEl = document.getElementById("txtPerformanceCounter");
+      var pagBar = document.getElementById("auditorPaginationBar");
+      if (!tbody || !thead) return;
+
+      var filtered = getFilteredReports();
+      var rSel = document.getElementById("selAuditorRoleFilter");
+      var sSel = document.getElementById("selAuditorStatusFilter");
+      var stSel = document.getElementById("selAuditorStoreFilter");
+
+      var rFilter = rSel ? rSel.value : "ALL";
+      var sFilter = sSel ? sSel.value : "ALL";
+      var stFilter = stSel ? stSel.value : "ALL";
+
+      if (currentPerfView === 'AUDITOR') {
+        if (pagBar) pagBar.classList.remove("hidden");
+
+        var getSortIcon = function(col) {
+          if (auditorSortColumn !== col) return ' <span class="text-slate-300">↕</span>';
+          return auditorSortAsc ? ' <span class="text-brand">▲</span>' : ' <span class="text-brand">▼</span>';
+        };
+
+        thead.innerHTML = '<tr>' +
+          '<th class="p-2 cursor-pointer select-none hover:text-corp-dark" onclick="setAuditorSort(\'name\')">Auditor' + getSortIcon('name') + '</th>' +
+          '<th class="p-2 cursor-pointer select-none hover:text-corp-dark" onclick="setAuditorSort(\'siteCode\')">Toko' + getSortIcon('siteCode') + '</th>' +
+          '<th class="p-2 text-center cursor-pointer select-none hover:text-corp-dark" onclick="setAuditorSort(\'count\')">Frekuensi' + getSortIcon('count') + '</th>' +
+          '<th class="p-2 text-center cursor-pointer select-none hover:text-corp-dark" onclick="setAuditorSort(\'avg\')">Rata-Rata' + getSortIcon('avg') + '</th>' +
+          '<th class="p-2 text-center">Status</th>' +
+        '</tr>';
+
+        var stats = {};
+        (masterEmployees || []).forEach(function(emp) {
+          var key = emp.name.toUpperCase().trim();
+          stats[key] = { name: emp.name, jobTitle: emp.jobTitle, siteCode: emp.storeCode, count: 0, totalScore: 0 };
+        });
+
+        filtered.forEach(function(r) {
+          var cleanName = (r.auditorName || "Auditor").split('(')[0].trim().toUpperCase();
+          if (!stats[cleanName]) {
+            stats[cleanName] = { name: r.auditorName.split('(')[0].trim(), jobTitle: r.jobTitle || "Auditor", siteCode: r.siteCode, count: 0, totalScore: 0 };
+          }
+          stats[cleanName].count++;
+          stats[cleanName].totalScore += normalizeScoreNum(r.score);
+        });
+
+        var list = Object.values(stats);
+        if (stFilter !== "ALL") list = list.filter(function(a) { return String(a.siteCode) === stFilter; });
+        if (rFilter !== "ALL") list = list.filter(function(a) { return a.jobTitle === rFilter; });
+        if (sFilter === "ACTIVE") list = list.filter(function(a) { return a.count > 0; });
+        else if (sFilter === "INACTIVE") list = list.filter(function(a) { return a.count === 0; });
+
+        // SORTING DATA
+        list.sort(function(a, b) {
+          var res = 0;
+          if (auditorSortColumn === 'name') {
+            res = a.name.localeCompare(b.name);
+          } else if (auditorSortColumn === 'siteCode') {
+            res = String(a.siteCode).localeCompare(String(b.siteCode));
+          } else if (auditorSortColumn === 'count') {
+            res = a.count - b.count;
+          } else if (auditorSortColumn === 'avg') {
+            var avgA = a.count > 0 ? (a.totalScore / a.count) : 0;
+            var avgB = b.count > 0 ? (b.totalScore / b.count) : 0;
+            res = avgA - avgB;
+          }
+          return auditorSortAsc ? res : -res;
+        });
+
+        var totalItems = list.length;
+        var totalPages = Math.max(1, Math.ceil(totalItems / auditorPageSize));
+        if (auditorCurrentPage > totalPages) auditorCurrentPage = totalPages;
+        if (auditorCurrentPage < 1) auditorCurrentPage = 1;
+
+        if (counterEl) counterEl.innerText = totalItems + " Personil";
+
+        var lblInfo = document.getElementById("lblAuditorPaginationInfo");
+        var bFirst = document.getElementById("btnPageFirst");
+        var bPrev = document.getElementById("btnPagePrev");
+        var bNext = document.getElementById("btnPageNext");
+        var bLast = document.getElementById("btnPageLast");
+
+        if (lblInfo) lblInfo.innerText = "Halaman " + auditorCurrentPage + " dari " + totalPages + " (" + totalItems + " Personil)";
+        if (bFirst) bFirst.disabled = (auditorCurrentPage <= 1);
+        if (bPrev) bPrev.disabled = (auditorCurrentPage <= 1);
+        if (bNext) bNext.disabled = (auditorCurrentPage >= totalPages);
+        if (bLast) bLast.disabled = (auditorCurrentPage >= totalPages);
+
+        if (totalItems === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-corp-muted">Tidak ada personil yang sesuai filter.</td></tr>';
+          return;
+        }
+
+        var startIdx = (auditorCurrentPage - 1) * auditorPageSize;
+        var pageItems = list.slice(startIdx, startIdx + auditorPageSize);
+
+        tbody.innerHTML = pageItems.map(function(a) {
+          var avg = a.count > 0 ? Math.round(a.totalScore / a.count) : 0;
+          var badge = a.count > 0 
+            ? '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[9px]">Aktif</span>'
+            : '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-900 font-bold text-[9px]">Belum Mengerjakan</span>';
+
+          return '<tr class="hover:bg-slate-50 transition">' +
+            '<td class="p-2">' +
+              '<span class="font-bold text-corp-dark block">' + a.name + '</span>' +
+              '<span class="text-[10px] text-corp-muted block font-semibold">' + a.jobTitle + '</span>' +
+            '</td>' +
+            '<td class="p-2 font-bold text-corp-dark">' + a.siteCode + '</td>' +
+            '<td class="p-2 text-center font-black ' + (a.count > 0 ? 'text-corp-dark' : 'text-rose-600') + '">' + a.count + 'x</td>' +
+            '<td class="p-2 text-center font-bold">' + (a.count > 0 ? avg + '%' : '-') + '</td>' +
+            '<td class="p-2 text-center">' + badge + '</td>' +
+          '</tr>';
+        }).join("");
+
+      } else {
+        // TAMPILAN PER TOKO
+        if (pagBar) pagBar.classList.add("hidden");
+
+        thead.innerHTML = '<tr>' +
+          '<th class="p-2">Unit Toko</th>' +
+          '<th class="p-2 text-center">Total Kunjungan</th>' +
+          '<th class="p-2 text-center">Rata-Rata Skor</th>' +
+          '<th class="p-2 text-center">Defect</th>' +
+        '</tr>';
+
+        var storeMap = {};
+        (masterData.stores || []).forEach(function(s) {
+          storeMap[s.siteCode] = { siteCode: s.siteCode, siteName: s.siteName, count: 0, totalScore: 0, issues: 0 };
+        });
+
+        filtered.forEach(function(r) {
+          var c = String(r.siteCode);
+          if (rFilter !== "ALL" && (r.jobTitle || r.auditorRole) !== rFilter) {
+            return;
+          }
+          if (storeMap[c]) {
+            storeMap[c].count++;
+            storeMap[c].totalScore += normalizeScoreNum(r.score);
+            storeMap[c].issues += (Number(r.totalNo) || 0);
+          }
+        });
+
+        var sRanked = Object.values(storeMap);
+
+        if (stFilter !== "ALL") {
+          sRanked = sRanked.filter(function(s) { return String(s.siteCode) === stFilter; });
+        }
+        if (sFilter === "ACTIVE") {
+          sRanked = sRanked.filter(function(s) { return s.count > 0; });
+        } else if (sFilter === "INACTIVE") {
+          sRanked = sRanked.filter(function(s) { return s.count === 0; });
+        }
+
+        sRanked.sort(function(a, b) { return b.count - a.count; });
+        if (counterEl) counterEl.innerText = sRanked.length + " Unit Toko";
+
+        if (sRanked.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-corp-muted">Tidak ada unit toko yang sesuai filter.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = sRanked.map(function(s) {
+          var avg = s.count > 0 ? Math.round(s.totalScore / s.count) + "%" : "-";
+          return '<tr class="hover:bg-slate-50 transition">' +
+            '<td class="p-2 font-bold text-corp-dark">' + s.siteCode + ' - ' + s.siteName + '</td>' +
+            '<td class="p-2 text-center font-black text-corp-dark">' + s.count + 'x</td>' +
+            '<td class="p-2 text-center font-bold">' + avg + '</td>' +
+            '<td class="p-2 text-center font-black ' + (s.issues > 0 ? 'text-brand' : 'text-slate-400') + '">' + s.issues + '</td>' +
+          '</tr>';
+        }).join("");
+      }
+    }
+
+    // ISOLASI STORE COMPLIANCE UNTUK STORE MANAGER (SM)
+    function renderStoreCompliance() {
+      var tbody = document.getElementById("tblStoreComplianceBody");
+      var summaryEl = document.getElementById("txtComplianceSummary");
+      if (!tbody) return;
+
+      var filtered = getFilteredReports();
+      var curRole = (currentUser && currentUser.role) ? currentUser.role : "SA";
+      var userStore = (currentUser && currentUser.storeCode) ? currentUser.storeCode : "ALL";
+
+      var map = {};
+      var sourceStores = masterData.stores || [];
+
+      // ISOLASI KETAT: Jika SM / Level Toko, batasi hanya pada tokonya sendiri
+      if (curRole !== "RM" && curRole !== "ADMIN" && userStore !== "ALL") {
+        sourceStores = sourceStores.filter(function(s) { return String(s.siteCode) === String(userStore); });
+      }
+
+      sourceStores.forEach(function(s) {
+        map[s.siteCode] = { siteCode: s.siteCode, siteName: s.siteName, open: false, reg: 0, close: false };
+      });
+
+      filtered.forEach(function(r) {
+        var c = String(r.siteCode);
+        if (map[c]) {
+          var type = String(r.checklistType || "").toUpperCase().trim();
+          var freq = String(r.frequency || "").toLowerCase().trim();
+
+          if (type === "OPENING" || freq === "opening") map[c].open = true;
+          else if (type === "CLOSING" || freq === "closing") map[c].close = true;
+          else map[c].reg++;
+        }
+      });
+
+      var sList = Object.values(map);
+      if (summaryEl) summaryEl.innerText = sList.length + " Unit Toko Terpantau";
+
+      if (sList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-corp-muted">Tidak ada unit toko yang dapat ditampilkan.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = sList.map(function(s) {
+        return '<tr class="hover:bg-slate-50 transition">' +
+          '<td class="p-2 font-bold text-corp-dark">' + s.siteCode + ' - ' + s.siteName + '</td>' +
+          '<td class="p-2 text-center">' + (s.open ? '<span class="text-emerald-700 font-bold">Sudah</span>' : '<span class="text-rose-700 font-bold">Belum</span>') + '</td>' +
+          '<td class="p-2 text-center font-black">' + s.reg + 'x</td>' +
+          '<td class="p-2 text-center">' + (s.close ? '<span class="text-emerald-700 font-bold">Sudah</span>' : '<span class="text-slate-400 font-bold">Belum</span>') + '</td>' +
+          '<td class="p-2 text-center font-bold text-[10px]">' + (s.reg > 0 ? 'Active' : '-') + '</td>' +
+        '</tr>';
+      }).join("");
+    }
+
+    function renderHistoryTable(filtered) {
+      var tbody = document.getElementById("tblDashboardBody");
+      var counter = document.getElementById("txtTableCounter");
+      if (!tbody) return;
+
+      if (counter) counter.innerText = filtered.length + " Laporan";
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-corp-muted">Tidak ada data laporan.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(function(r) {
+        var sc = normalizeScoreNum(r.score);
+        var st = String(r.processStatus || "Submitted").trim();
+        var badgeCls = "bg-slate-100 text-corp-muted";
+
+        if (st.toLowerCase().indexOf("completed") !== -1 || st.toLowerCase().indexOf("approved") !== -1) {
+          badgeCls = "bg-emerald-100 text-emerald-900 border border-emerald-300";
+        } else if (st.toLowerCase().indexOf("waiting approval") !== -1) {
+          badgeCls = "bg-amber-100 text-amber-900 border border-amber-300";
+        } else if (st.toLowerCase().indexOf("waiting follow up") !== -1 || st.toLowerCase().indexOf("action") !== -1) {
+          badgeCls = "bg-rose-100 text-rose-900 border border-rose-300";
+        }
+
+        var cType = String(r.checklistType || "REGULAR").toUpperCase();
+        var typeBadge = "";
+        if (cType === "OPENING") {
+          typeBadge = '<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-black text-[9px] uppercase border border-amber-300">OPENING</span>';
+        } else if (cType === "CLOSING") {
+          typeBadge = '<span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-900 font-black text-[9px] uppercase border border-indigo-300">CLOSING</span>';
+        } else {
+          typeBadge = '<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold text-[9px] uppercase border border-slate-200">WALKTHROUGH</span>';
+        }
+
+        return '<tr class="hover:bg-slate-50 transition">' +
+          '<td class="p-2.5 font-bold text-corp-dark">' + formatWibDisplay(r.timestamp) + '</td>' +
+          '<td class="p-2.5 font-black text-corp-dark">' + r.siteCode + ' - ' + r.siteName + '</td>' +
+          '<td class="p-2.5 font-semibold text-corp-dark">' +
+            r.auditorName.split('(')[0] +
+            '<span class="text-[10px] text-corp-muted block font-semibold">' + (r.jobTitle || "SUPERVISOR AREA") + '</span>' +
+          '</td>' +
+          '<td class="p-2.5 text-center">' + typeBadge + '</td>' +
+          '<td class="p-2.5 text-center"><span class="px-2 py-0.5 rounded bg-slate-50 font-bold text-[10px] text-corp-dark border border-corp-border">' + r.frequency + '</span></td>' +
+          '<td class="p-2.5 text-center font-black ' + (sc >= 85 ? 'text-emerald-700' : 'text-brand') + '">' + sc + '%</td>' +
+          '<td class="p-2.5 text-center"><span class="px-2 py-0.5 rounded font-black text-[10px] uppercase ' + badgeCls + '">' + st + '</span></td>' +
+        '</tr>';
+      }).join("");
+    }
+
+    function exportAuditorPerformanceCsv() {
+      var filtered = getFilteredReports();
+      var rows = [];
+
+      if (currentPerfView === 'AUDITOR') {
+        var stats = {};
+        (masterEmployees || []).forEach(function(emp) {
+          stats[emp.name.toUpperCase().trim()] = { name: emp.name, jobTitle: emp.jobTitle, siteCode: emp.storeCode, count: 0, totalScore: 0 };
+        });
+
+        filtered.forEach(function(r) {
+          var key = (r.auditorName || "").split('(')[0].trim().toUpperCase();
+          if (!stats[key]) stats[key] = { name: r.auditorName.split('(')[0].trim(), jobTitle: r.jobTitle, siteCode: r.siteCode, count: 0, totalScore: 0 };
+          stats[key].count++;
+          stats[key].totalScore += normalizeScoreNum(r.score);
+        });
+
+        rows = [["Nama Auditor", "Job Title", "Unit Toko", "Frekuensi", "Rata-Rata Skor", "Status"]];
+        Object.values(stats).forEach(function(a) {
+          var avg = a.count > 0 ? Math.round(a.totalScore / a.count) + "%" : "-";
+          rows.push([a.name, a.jobTitle, a.siteCode, a.count, avg, a.count > 0 ? "Aktif" : "Belum Mengerjakan"]);
+        });
+      } else {
+        rows = [["Site Code", "Nama Toko", "Total Kunjungan", "Rata-Rata Skor", "Total Defect"]];
+        var sMap = {};
+        (masterData.stores || []).forEach(function(s) {
+          sMap[s.siteCode] = { siteCode: s.siteCode, siteName: s.siteName, count: 0, totalScore: 0, issues: 0 };
+        });
+        filtered.forEach(function(r) {
+          var c = String(r.siteCode);
+          if (sMap[c]) {
+            sMap[c].count++;
+            sMap[c].totalScore += normalizeScoreNum(r.score);
+            sMap[c].issues += (Number(r.totalNo) || 0);
+          }
+        });
+        Object.values(sMap).forEach(function(s) {
+          var avg = s.count > 0 ? Math.round(s.totalScore / s.count) + "%" : "-";
+          rows.push([s.siteCode, s.siteName, s.count, avg, s.issues]);
+        });
+      }
+
+      var csvContent = "data:text/csv;charset=utf-8," + rows.map(function(e) { return e.join(","); }).join("\n");
+      var link = document.createElement("a");
+      link.setAttribute("href", encodeURI(csvContent));
+      link.setAttribute("download", "Performa_" + currentPerfView + "_" + new Date().toISOString().substring(0, 10) + ".csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function populateStoreOptions() {
+      var select = document.getElementById("dashFilterStore");
+      if (!select || !masterData.stores) return;
+      var cur = select.value;
+      select.innerHTML = '<option value="ALL">Semua Unit Toko</option>';
+      masterData.stores.forEach(function(s) {
+        select.innerHTML += '<option value="' + s.siteCode + '">' + s.siteCode + ' - ' + s.siteName + '</option>';
+      });
+      select.value = cur;
+    }
+
+    function populateAuditorStoreFilterOptions() {
+      var select = document.getElementById("selAuditorStoreFilter");
+      if (!select || !masterData.stores) return;
+      var cur = select.value;
+      select.innerHTML = '<option value="ALL">Semua Toko</option>';
+      masterData.stores.forEach(function(s) {
+        select.innerHTML += '<option value="' + s.siteCode + '">' + s.siteCode + ' - ' + s.siteName + '</option>';
+      });
+      select.value = cur;
+    }
+
+    function populateJobTitleFilterOptions() {
+      var select = document.getElementById("selAuditorRoleFilter");
+      if (!select || !masterEmployees) return;
+      var cur = select.value;
+      var uniqueJobs = [];
+      masterEmployees.forEach(function(e) {
+        if (e.jobTitle && uniqueJobs.indexOf(e.jobTitle) === -1) uniqueJobs.push(e.jobTitle);
+      });
+      select.innerHTML = '<option value="ALL">Semua Jabatan</option>';
+      uniqueJobs.forEach(function(j) { select.innerHTML += '<option value="' + j + '">' + j + '</option>'; });
+      select.value = cur;
+    }
+
+    // VISUAL HIGHLIGHT & QUICK PERIOD LOGIC
+    function updateQuickPeriodButtonsVisual() {
+      var btnToday = document.getElementById("btnPeriodToday");
+      var btnYest = document.getElementById("btnPeriodYesterday");
+      var btnL7 = document.getElementById("btnPeriodLast7");
+      var btnL30 = document.getElementById("btnPeriodLast30");
+
+      var inactClass = "px-2 py-1 rounded border border-corp-border bg-white text-corp-dark font-bold text-[10px] hover:bg-slate-50 transition";
+      var actClass = "px-2 py-1 rounded border border-brand bg-brand text-white font-black text-[10px] shadow-xs transition";
+
+      if (btnToday) btnToday.className = (currentActivePeriod === 'TODAY' ? actClass : inactClass);
+      if (btnYest) btnYest.className = (currentActivePeriod === 'YESTERDAY' ? actClass : inactClass);
+      if (btnL7) btnL7.className = (currentActivePeriod === 'LAST7' ? actClass : inactClass);
+      if (btnL30) btnL30.className = (currentActivePeriod === 'LAST30' ? actClass : inactClass);
+    }
+
+    function clearQuickPeriodActive() {
+      currentActivePeriod = "";
+      updateQuickPeriodButtonsVisual();
+    }
+
+    function setDashboardQuickPeriod(period, autoRender) {
+      currentActivePeriod = period;
+      updateQuickPeriodButtonsVisual();
+
+      var f = document.getElementById("dashDateFrom");
+      var t = document.getElementById("dashDateTo");
+      var now = new Date();
+
+      function toIsoDate(d) {
+        var year = d.getFullYear();
+        var month = String(d.getMonth() + 1).padStart(2, '0');
+        var day = String(d.getDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+      }
+
+      if (period === 'TODAY') {
+        var today = toIsoDate(now);
+        if (f) f.value = today;
+        if (t) t.value = today;
+      } else if (period === 'YESTERDAY') {
+        var yest = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        var yStr = toIsoDate(yest);
+        if (f) f.value = yStr;
+        if (t) t.value = yStr;
+      } else if (period === 'LAST7') {
+        var l7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        if (f) f.value = toIsoDate(l7);
+        if (t) t.value = toIsoDate(now);
+      } else if (period === 'LAST30') {
+        var l30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        if (f) f.value = toIsoDate(l30);
+        if (t) t.value = toIsoDate(now);
+      } else if (period === 'RESET') {
+        if (f) f.value = "";
+        if (t) t.value = "";
+        var elStatus = document.getElementById("dashFilterStatus");
+        if (elStatus) elStatus.value = "ALL";
+        var elType = document.getElementById("dashFilterType");
+        if (elType) elType.value = "ALL";
+      }
+
+      if (autoRender !== false) {
+        auditorCurrentPage = 1;
+        renderDashboardView();
+      }
+    }
+
+    // REVIEW (RESULT MASUKAN)
+    function switchActionSubTab(tab) {
+      currentActionSubTab = tab;
+      var btnOngoing = document.getElementById("subTabOngoing");
+      var btnArchived = document.getElementById("subTabArchived");
+      var thAction = document.getElementById("thActionHeader");
+
+      if (tab === "ONGOING") {
+        if (btnOngoing) btnOngoing.className = "px-3 py-1 rounded bg-white shadow-xs text-brand font-black text-xs";
+        if (btnArchived) btnArchived.className = "px-3 py-1 rounded text-corp-muted font-bold text-xs";
+        if (thAction) thAction.innerText = "Aksi";
+      } else {
+        if (btnOngoing) btnOngoing.className = "px-3 py-1 rounded text-corp-muted font-bold text-xs";
+        if (btnArchived) btnArchived.className = "px-3 py-1 rounded bg-white shadow-xs text-brand font-black text-xs";
+        if (thAction) thAction.innerText = "SLA (Days)";
+      }
+      renderActionItemsTable();
+    }
+
+    function renderActionItemsTable() {
+      var tbody = document.getElementById("tblActionItemsBody");
+      if (!tbody) return;
+
+      var curRole = (currentUser && currentUser.role) ? currentUser.role : "RM";
+      var selStore = document.getElementById("selResultStoreFilter");
+      var fStore = selStore ? selStore.value : "ALL";
+
+      if (selStore && masterData.stores && selStore.options.length <= 1) {
+        masterData.stores.forEach(function(s) {
+          var opt = document.createElement("option");
+          opt.value = s.siteCode;
+          opt.innerText = s.siteCode + " - " + s.siteName;
+          selStore.appendChild(opt);
+        });
+      }
+
+      var allItems = rawActionItems || [];
+      var ongoingItems = allItems.filter(function(a) { return String(a.status || "").toLowerCase() !== "archived"; });
+      var archivedItems = allItems.filter(function(a) { return String(a.status || "").toLowerCase() === "archived"; });
+
+      var overdueCount = ongoingItems.filter(function(a) { return a.isOverdue; }).length;
+      var pendingCount = ongoingItems.filter(function(a) { return String(a.status || "").toLowerCase() === "pending"; }).length;
+
+      var mAct = document.getElementById("metricActiveIssues");
+      var mOvd = document.getElementById("metricOverdueIssues");
+      var mPnd = document.getElementById("metricPendingFollowUp");
+      var bOngoing = document.getElementById("badgeOngoingCount");
+      var bArchived = document.getElementById("badgeArchivedCount");
+
+      if (mAct) mAct.innerText = ongoingItems.length;
+      if (mOvd) mOvd.innerText = overdueCount;
+      if (mPnd) mPnd.innerText = pendingCount;
+      if (bOngoing) bOngoing.innerText = ongoingItems.length;
+      if (bArchived) bArchived.innerText = archivedItems.length;
+
+      var items = (currentActionSubTab === "ONGOING" ? ongoingItems : archivedItems).filter(function(item) {
+        if (fStore !== "ALL" && String(item.siteCode) !== fStore) return false;
+        return true;
+      });
+
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-corp-muted">Belum ada data temuan dalam kategori ini.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = items.map(function(act) {
+        var slaBadge = "";
+        if (act.ageHours > 48) {
+          slaBadge = '<span class="px-1.5 py-0.5 rounded bg-rose-600 text-white font-black text-[9px] uppercase tracking-wider block mt-1">Overdue • ' + act.ageHours + 'h</span>';
+        } else if (act.ageHours >= 24) {
+          slaBadge = '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[9px] block mt-1">Mendekati SLA • ' + act.ageHours + 'h</span>';
+        } else {
+          slaBadge = '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[9px] block mt-1">' + act.ageHours + ' jam lalu</span>';
+        }
+
+        var actionBlock = "";
+        if (currentActionSubTab === "ONGOING") {
+          if (curRole === "RM" || curRole === "ADMIN") {
+            actionBlock = '<div class="flex flex-col space-y-1">' +
+              '<button type="button" onclick="verifyAndCloseTicket(\'' + act.actionId + '\')" class="w-full py-1 px-1.5 rounded bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[9px] shadow-xs transition">Approve &amp; Close</button>' +
+              '<div class="flex items-center space-x-1">' +
+                '<button type="button" onclick="openActionModal(\'' + act.actionId + '\', true)" class="flex-1 py-1 px-1 rounded border border-amber-600 bg-white hover:bg-amber-50 text-amber-800 font-bold text-[9px] shadow-2xs transition">Remind SM</button>' +
+                '<button type="button" onclick="executeRmDeleteTicket(\'' + act.actionId + '\')" class="py-1 px-1.5 rounded border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 font-bold text-[9px] shadow-2xs transition" title="Hapus Masukan">Hapus</button>' +
+              '</div>' +
+            '</div>';
+          } else {
+            actionBlock = '<button type="button" onclick="openActionModal(\'' + act.actionId + '\', false)" class="w-full py-1.5 px-2 rounded bg-brand hover:bg-brand-dark text-white font-bold text-[10px] shadow-xs transition">Tindak Lanjut</button>';
+          }
+        } else {
+          actionBlock = '<span class="font-black text-xs text-corp-dark block text-center">' + (act.slaDays || 0) + '</span>';
+        }
+
+        var displayName = (act.siteName && act.siteName !== act.siteCode) ? act.siteCode + " - " + act.siteName : "Toko " + act.siteCode;
+
+        return '<tr class="hover:bg-slate-50 transition border-b border-corp-border/60">' +
+          '<td class="p-2.5 align-top">' +
+            '<span class="font-bold text-corp-dark block text-[11px]">' + formatWibDisplay(act.timestamp) + '</span>' +
+            '<span class="text-[9px] text-corp-muted block mt-0.5 font-mono truncate" title="' + act.actionId + '">' + act.actionId.substring(0, 16) + '...</span>' +
+          '</td>' +
+          '<td class="p-2.5 align-top">' +
+            '<span class="font-black text-corp-dark block text-[11px] leading-tight">' + displayName + '</span>' +
+            '<span class="text-[11px] font-semibold text-corp-dark block mt-0.5 truncate">' + act.auditorName.split('(')[0] + '</span>' +
+            '<span class="text-[10px] text-corp-muted block truncate">' + act.jobTitle + '</span>' +
+          '</td>' +
+          '<td class="p-2.5 align-top space-y-1.5">' +
+            '<h4 class="font-bold text-corp-dark text-[11px] leading-tight">' + act.questionText + '</h4>' +
+            '<div class="text-[11px] leading-tight">' +
+              '<span class="inline-block px-1 py-0.2 rounded bg-rose-100 text-brand font-black text-[9px] uppercase mr-1">Issue</span>' +
+              '<span class="text-corp-dark font-medium">' + act.issueDescription + '</span>' +
+            '</div>' +
+            '<div class="text-[11px] leading-tight text-corp-muted">' +
+              '<span class="inline-block px-1 py-0.2 rounded bg-slate-200 text-slate-800 font-black text-[9px] uppercase mr-1">Plan</span>' +
+              '<span class="font-normal">' + act.actionPlan + '</span>' +
+            '</div>' +
+          '</td>' +
+          '<td class="p-2.5 align-top text-center">' +
+            '<span class="px-2 py-0.5 rounded bg-slate-100 text-corp-dark font-black text-[10px] block">' + act.status + '</span>' +
+            slaBadge +
+          '</td>' +
+          '<td class="p-2.5 align-top text-center">' + actionBlock + '</td>' +
+        '</tr>';
+      }).join("");
+    }
+
+    function verifyAndCloseTicket(actionId) {
+      if (!confirm("Apakah Anda yakin ingin memverifikasi dan menutup (Approve & Close) tiket temuan ini?")) return;
+      var curRole = (currentUser && currentUser.role) ? currentUser.role : "RM";
+      var userStore = (currentUser && currentUser.storeCode) ? currentUser.storeCode : "ALL";
+
+      executeApiCall("updateAction", {
+        actionId: actionId,
+        newStatus: "Archived",
+        notes: "Diverifikasi & Disetujui oleh Regional Manager",
+        isReminder: false,
+        storeCode: userStore,
+        role: curRole
+      }, function(res) {
+        if (res && res.success) {
+          alert("Tiket berhasil diverifikasi dan ditutup (Archived)!");
+          loadAllOperationalData();
+        } else {
+          alert("Gagal: " + (res ? res.message : "Error"));
+        }
+      });
+    }
+
+    function executeRmDeleteTicket(actionId) {
+      if (!confirm("PERINGATAN: Tiket temuan ini akan dihapus secara permanen dari database. Lanjutkan?")) return;
+      var curRole = (currentUser && currentUser.role) ? currentUser.role : "RM";
+
+      executeApiCall("deleteAction", { actionId: actionId, role: curRole }, function(res) {
+        if (res && res.success) {
+          alert(res.message);
+          loadAllOperationalData();
+        } else {
+          alert("Gagal hapus: " + (res ? res.message : "Error"));
+        }
+      });
+    }
+
+    function openActionModal(actionId, isReminder) {
+      selectedModalActionId = actionId;
+      var item = (rawActionItems || []).find(function(a) { return a.actionId === actionId; });
+      if (!item) return;
+
+      var modal = document.getElementById("modalActionFollowUp");
+      var mTitle = document.getElementById("modalTitle");
+      var mMeta = document.getElementById("modalMetaInfo");
+      var mSop = document.getElementById("modalSopText");
+      var mIssue = document.getElementById("modalIssueText");
+      var cInput = document.getElementById("containerModalInput");
+      var cRemind = document.getElementById("containerModalReminder");
+      var btnSubmit = document.getElementById("btnSubmitModalAction");
+
+      mMeta.innerText = item.actionId + " • " + (item.siteName || ("Toko " + item.siteCode));
+      mSop.innerText = item.questionText;
+      mIssue.innerText = item.issueDescription;
+
+      if (isReminder) {
+        mTitle.innerText = "Kirim Pengingat ke Store Manager";
+        cInput.classList.add("hidden");
+        cRemind.classList.remove("hidden");
+        btnSubmit.innerText = "Kirim Reminder";
+      } else {
+        mTitle.innerText = "Tindak Lanjut Realisasi Perbaikan";
+        cInput.classList.remove("hidden");
+        cRemind.classList.add("hidden");
+        btnSubmit.innerText = "Simpan Perbaikan";
+        document.getElementById("txtFollowUpNotes").value = item.actionPlan || "";
+      }
+
+      modal.classList.remove("hidden");
+    }
+
+    function closeFollowUpModal() {
+      var modal = document.getElementById("modalActionFollowUp");
+      if (modal) modal.classList.add("hidden");
+      selectedModalActionId = null;
+    }
+
+    function submitModalActionFollowUp() {
+      if (!selectedModalActionId) return;
+      var btn = document.getElementById("btnSubmitModalAction");
+      var curRole = (currentUser && currentUser.role) ? currentUser.role : "RM";
+      var userStore = (currentUser && currentUser.storeCode) ? currentUser.storeCode : "ALL";
+      var isReminder = (curRole === "RM");
+
+      var newStatus = document.getElementById("selFollowUpStatus").value;
+      var notes = document.getElementById("txtFollowUpNotes").value;
+
+      btn.disabled = true;
+      btn.innerText = "Memproses...";
+
+      executeApiCall("updateAction", {
+        actionId: selectedModalActionId,
+        newStatus: newStatus,
+        notes: notes,
+        isReminder: isReminder,
+        storeCode: userStore,
+        role: curRole
+      }, function(res) {
+        btn.disabled = false;
+        closeFollowUpModal();
+        if (res && res.success) {
+          alert(res.message);
+          loadAllOperationalData();
+        } else {
+          alert("Gagal: " + (res ? res.message : "Error"));
+        }
+      }, function(err) {
+        btn.disabled = false;
+        closeFollowUpModal();
+        alert("Koneksi gagal: " + err.toString());
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", function() {
+      try {
+        var saved = localStorage.getItem("MDS_AUDIT_USER");
+        if (saved) {
+          currentUser = JSON.parse(saved);
+          setupUserSession();
+          return;
+        }
+      } catch(e){}
+      document.getElementById("fullAuthScreen").classList.remove("hidden");
+    });
+  </script>
+</body>
+</html>

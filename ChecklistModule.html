@@ -1,8 +1,17 @@
 <!-- ======================================================== -->
-<!-- CHECKLIST FORM: STRICT OPENING VS REGULAR ISOLATION      -->
+<!-- CHECKLIST FORM: TIME-LOCK 09-21 WIB & STRICT ISOLATION   -->
 <!-- ======================================================== -->
 <main id="auditFormView" class="hidden max-w-4xl mx-auto px-4 py-5 space-y-4 print:hidden">
   
+  <!-- BANNER STATUS JAM OPERASIONAL TOKO -->
+  <div id="bannerTimeLock" class="hidden p-3 rounded border text-xs font-bold flex items-center justify-between">
+    <div class="flex items-center space-x-2">
+      <span id="iconTimeLock" class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+      <span id="txtTimeLockStatus">Jam Operasional Walkthrough Aktif: 09.00 - 21.00 WIB</span>
+    </div>
+    <span id="lblCurrentHourWib" class="text-[10px] text-corp-muted font-mono font-bold">WIB</span>
+  </div>
+
   <div class="bg-white p-4 rounded border border-corp-border shadow-xs space-y-3">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-corp-border pb-3">
       <div>
@@ -11,7 +20,6 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <!-- PILIHAN TOKO KUNJUNGAN KHUSUS RM -->
         <div id="containerChecklistStoreSelect" class="hidden flex items-center space-x-1">
           <span class="text-[10px] font-black uppercase text-brand">Kunjungan:</span>
           <select id="selectAuditStore" class="px-2 py-1 rounded border border-brand bg-brand-surface font-bold text-xs text-corp-dark focus:outline-hidden">
@@ -19,7 +27,6 @@
           </select>
         </div>
 
-        <!-- TIPE CHECKLIST EKSPLISIT: TERBUKA UNTUK SELURUH ROLE OPERASIONAL TOKO -->
         <div id="containerChecklistType">
           <select id="selectChecklistType" onchange="syncChecklistControls()" class="px-2.5 py-1 rounded border border-corp-border bg-corp-surface font-bold text-xs text-corp-dark">
             <option value="REGULAR">Regular Walkthrough</option>
@@ -61,6 +68,59 @@
   var activeQuestions = [];
   var formAnswers = {};
 
+  function checkStoreOperationalHours() {
+    var now = new Date();
+    var utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    var wibDate = new Date(utc + (3600000 * 7));
+    var curHour = wibDate.getHours();
+    var curMinute = wibDate.getMinutes();
+
+    var curRole = (currentUser && currentUser.role) ? currentUser.role : "SA";
+    var cTypeSelect = document.getElementById("selectChecklistType");
+    var curType = cTypeSelect ? cTypeSelect.value.trim().toUpperCase() : "REGULAR";
+
+    var banner = document.getElementById("bannerTimeLock");
+    var icon = document.getElementById("iconTimeLock");
+    var txtStatus = document.getElementById("txtTimeLockStatus");
+    var lblClock = document.getElementById("lblCurrentHourWib");
+    var btn = document.getElementById("btnSubmitChecklist");
+
+    var timeStr = (curHour < 10 ? '0' + curHour : curHour) + '.' + (curMinute < 10 ? '0' + curMinute : curMinute) + ' WIB';
+    if (lblClock) lblClock.innerText = timeStr;
+
+    if (banner) banner.classList.remove("hidden");
+
+    if (curRole === "RM" || curRole === "ADMIN") {
+      if (banner) banner.className = "p-3 rounded border bg-slate-50 border-slate-200 text-slate-800 text-xs font-bold flex items-center justify-between";
+      if (icon) icon.className = "w-2.5 h-2.5 rounded-full bg-slate-600";
+      if (txtStatus) txtStatus.innerText = "Mode Supervisi: Akses Walkthrough Tanpa Batas Jam (RM/Admin)";
+      if (btn) { btn.disabled = false; btn.classList.remove("opacity-50", "cursor-not-allowed"); }
+      return true;
+    }
+
+    if (curType === "OPENING" || curType === "CLOSING") {
+      if (banner) banner.className = "p-3 rounded border bg-blue-50 border-blue-200 text-blue-900 text-xs font-bold flex items-center justify-between";
+      if (icon) icon.className = "w-2.5 h-2.5 rounded-full bg-blue-600";
+      if (txtStatus) txtStatus.innerText = "Akses Khusus Persiapan: Checklist " + curType;
+      if (btn) { btn.disabled = false; btn.classList.remove("opacity-50", "cursor-not-allowed"); }
+      return true;
+    }
+
+    if (curHour >= 9 && curHour < 21) {
+      if (banner) banner.className = "p-3 rounded border bg-emerald-50 border-emerald-200 text-emerald-900 text-xs font-bold flex items-center justify-between";
+      if (icon) icon.className = "w-2.5 h-2.5 rounded-full bg-emerald-600";
+      if (txtStatus) txtStatus.innerText = "Jam Operasional Walkthrough Aktif: 09.00 - 21.00 WIB";
+      if (btn) { btn.disabled = false; btn.classList.remove("opacity-50", "cursor-not-allowed"); }
+      return true;
+    } else {
+      if (banner) banner.className = "p-3 rounded border bg-rose-50 border-rose-200 text-rose-900 text-xs font-bold flex items-center justify-between";
+      if (icon) icon.className = "w-2.5 h-2.5 rounded-full bg-rose-600";
+      if (txtStatus) txtStatus.innerText = "Walkthrough Reguler Terkunci (Hanya Aktif Pukul 09.00 - 21.00 WIB)";
+      if (btn) { btn.disabled = true; btn.classList.add("opacity-50", "cursor-not-allowed"); }
+      return false;
+    }
+  }
+
   function syncChecklistControls() {
     if (!masterData.questions || masterData.questions.length === 0) return;
 
@@ -70,7 +130,6 @@
     var cTypeSelect = document.getElementById("selectChecklistType");
     var freqSelect = document.getElementById("selectFrequency");
 
-    // RM MEMILIH TOKO KUNJUNGAN & TERKUNCI PADA REGULAR
     if (curRole === "RM" || (currentUser && currentUser.storeCode === "ALL")) {
       if (cStoreContainer) {
         cStoreContainer.classList.remove("hidden");
@@ -86,22 +145,16 @@
     var selectedType = cTypeSelect ? cTypeSelect.value.trim().toUpperCase() : "REGULAR";
     var curFreq = freqSelect ? freqSelect.value.trim().toLowerCase() : "daily";
 
-    // FILTER KETAT: ISOLASI TOTAL OPENING DENGAN REGULAR
     activeQuestions = masterData.questions.filter(function(q) {
       var itemType = String(q.checklistType || "REGULAR").trim().toUpperCase();
       var qReqRole = String(q.requiredRole || "").toUpperCase().trim();
       var qFreq = String(q.frequency || "Daily").trim().toLowerCase();
 
-      // 1. Validasi Tipe Eksplisit
       if (selectedType === "OPENING") {
-        if (itemType !== "OPENING") return false;
-        // Buka Opening untuk semua role operasional toko
-        return true;
+        return (itemType === "OPENING");
       } else if (selectedType === "CLOSING") {
-        if (itemType !== "CLOSING") return false;
-        return true;
+        return (itemType === "CLOSING");
       } else {
-        // REGULAR WALKTHROUGH: Haram menampilkan soal OPENING atau CLOSING
         if (itemType === "OPENING" || itemType === "CLOSING") return false;
 
         var freqMatch = (qFreq === curFreq);
@@ -118,6 +171,7 @@
       }
     });
 
+    checkStoreOperationalHours();
     renderQuestionsUI();
   }
 
@@ -136,7 +190,6 @@
     var container = document.getElementById("checklistQuestionsContainer");
     if (!container) return;
 
-    var curJob = (currentUser && currentUser.jobTitle) ? currentUser.jobTitle : "Auditor";
     var cTypeSelect = document.getElementById("selectChecklistType");
     var curType = cTypeSelect ? cTypeSelect.value : "REGULAR";
 
@@ -166,7 +219,6 @@
           '<button type="button" onclick="setAnswer(\'' + q.id + '\', \'Fail\')" class="py-2 rounded font-bold text-xs border ' + (isFail ? 'bg-brand text-white' : 'bg-slate-50 text-corp-muted border-corp-border') + '">Fail</button>' +
         '</div>' +
 
-        // DUAL FAIL: EVENT ONINPUT MENCEGAH VALUE HILANG
         '<div class="' + (isFail ? 'block' : 'hidden') + ' p-3 rounded bg-rose-50 border border-rose-200 space-y-2.5 text-xs">' +
           '<div>' +
             '<label class="block font-black text-[10px] uppercase text-rose-900 mb-1">1. Uraian Temuan Kerusakan / Issue *</label>' +
@@ -213,12 +265,16 @@
   }
 
   function handleChecklistSubmission() {
+    if (!checkStoreOperationalHours()) {
+      alert("Pengiriman Regular Walkthrough hanya diizinkan pada jam operasional 09.00 - 21.00 WIB!");
+      return;
+    }
+
     var btn = document.getElementById("btnSubmitChecklist");
     var unans = [];
     var invalidFails = [];
     var answersPayload = [];
 
-    // DIRECT DOM FALLBACK SEBELUM VALIDASI
     for (var i = 0; i < activeQuestions.length; i++) {
       var q = activeQuestions[i];
       var a = formAnswers[q.id];

@@ -1,7 +1,7 @@
 /**
  * ============================================================================
- * BACKEND CONTROLLER - MATAHARI STORE VISIT AUDIT & ANALYTICS
- * Full Dynamic Resolver, Subordinate Visibility, BOLA Defense & Strict Types
+ * BACKEND CONTROLLER & REST API ENGINE - MATAHARI STORE VISIT AUDIT
+ * Dual-Mode: Native GAS Web App & REST API Handler for Vercel Frontend
  * ============================================================================
  */
 
@@ -15,6 +15,40 @@ function doGet(e) {
 
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/**
+ * REST API ENDPOINT UTAMA UNTUK VERCEL FRONTEND
+ */
+function doPost(e) {
+  try {
+    var raw = e.postData ? e.postData.contents : "{}";
+    var body = JSON.parse(raw);
+    var action = body.action;
+    var result = null;
+
+    if (action === "verifyLogin") {
+      result = verifyLoginCredentials(body.userId, body.password);
+    } else if (action === "getMasterData") {
+      result = getMasterData();
+    } else if (action === "getReports") {
+      result = getHistoricalReports(body.role, body.siteCode, body.region, body.userId);
+    } else if (action === "submitAudit") {
+      result = submitAuditWalkthrough(body.payload);
+    } else if (action === "updateAction") {
+      result = updateActionItemRecord(body.actionId, body.newStatus, body.notes, body.isReminder, body.storeCode, body.role);
+    } else if (action === "deleteAction") {
+      result = deleteActionItemRecord(body.actionId, body.role);
+    } else {
+      result = { success: false, message: "Aksi API tidak valid" };
+    }
+
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function buildHeaderIndexMap(headerRow) {
@@ -203,7 +237,7 @@ function getMasterData() {
   return { stores: stores, questions: questions, brands: brands, divisions: divisions };
 }
 
-// 3. GET HISTORICAL REPORTS (SUBORDINATE CAN VIEW SUPERIOR AT SAME STORE)
+// 3. GET HISTORICAL REPORTS (SUBORDINATE VISIBILITY & STRICT 24-HOUR FORMAT)
 function getHistoricalReports(role, siteCode, region, userId) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var reports = [];
@@ -211,7 +245,6 @@ function getHistoricalReports(role, siteCode, region, userId) {
   var employees = [];
   var now = new Date();
 
-  // Index Store Master
   var storeMap = {};
   var sSheet = ss.getSheetByName("Store_Master");
   if (sSheet) {
@@ -228,7 +261,6 @@ function getHistoricalReports(role, siteCode, region, userId) {
     }
   }
 
-  // Index Employee Master
   var empSheet = ss.getSheetByName("Employee_Master");
   var empLookup = {};
   if (empSheet) {
@@ -310,7 +342,6 @@ function getHistoricalReports(role, siteCode, region, userId) {
           auditActionStatusMap[aAuditId].push(itemStatus.toLowerCase());
         }
 
-        // HAK AKSES TEMUAN: JIKA BUKAN RM/ADMIN, WAJIB TOKO YANG SAMA
         if (currentUser.role !== "ADMIN" && currentUser.role !== "RM") {
           if (currentUser.storeCode && currentUser.storeCode !== "ALL" && aStore !== currentUser.storeCode) {
             continue;
@@ -392,7 +423,7 @@ function getHistoricalReports(role, siteCode, region, userId) {
       var rawAuditorRole = String(row[cAuditorRole] || "SA").trim();
       var auditIdVal = String(row[cAuditId]).trim();
 
-      // HAK AKSES LAPORAN: SUBORDINATE BISA MELIHAT LAPORAN SUPERIOR DI TOKO YANG SAMA
+      // Subordinate dapat melihat laporan toko yang sama
       if (currentUser.role !== "ADMIN" && currentUser.role !== "RM") {
         if (currentUser.storeCode && currentUser.storeCode !== "ALL" && storeVal !== currentUser.storeCode) {
           continue;
@@ -401,10 +432,8 @@ function getHistoricalReports(role, siteCode, region, userId) {
 
       var matchedEmp = empLookup[auditorNameVal.toUpperCase()];
       var officialJob = matchedEmp ? matchedEmp.jobTitle : rawAuditorRole;
-
       var timeStr = formatToSafeWibString(row[cTimestamp]);
 
-      // SANITASI NAMA TOKO LENGKAP
       var resolvedStoreName = storeMap[storeVal];
       if (!resolvedStoreName || resolvedStoreName === storeVal) {
         resolvedStoreName = String(row[cSiteName] || "").trim();
@@ -413,7 +442,6 @@ function getHistoricalReports(role, siteCode, region, userId) {
         }
       }
 
-      // KALKULASI STATUS DINAMIS
       var totalFail = Number(row[cNo]) || 0;
       var computedStatus = "Completed";
 
@@ -471,7 +499,7 @@ function getHistoricalReports(role, siteCode, region, userId) {
   return { reports: reports, actionItems: actionItems, employees: employees };
 }
 
-// 4. SUBMIT WALKTHROUGH DENGAN BATCH WRITE & ISOLASI TIPE EKSPLISIT
+// 4. SUBMIT WALKTHROUGH DENGAN VALIDASI JAM OPERASIONAL 24 JAM
 function submitAuditWalkthrough(payload) {
   var lock = LockService.getScriptLock();
   lock.tryLock(15000);
@@ -483,6 +511,16 @@ function submitAuditWalkthrough(payload) {
     if (!sheet) sheet = ss.getSheetByName("Report_SA");
 
     var now = new Date();
+    var explicitType = String(payload.checklistType || "REGULAR").trim().toUpperCase();
+
+    // BACKEND TIME-LOCK: 09.00 - 21.00 WIB untuk Regular Walkthrough Level Toko
+    var nowHourWib = parseInt(Utilities.formatDate(now, "Asia/Jakarta", "HH"), 10);
+    if (explicitType === "REGULAR" && curRole !== "RM" && curRole !== "ADMIN") {
+      if (nowHourWib < 9 || nowHourWib >= 21) {
+        return { success: false, message: "Akses Ditolak: Regular Walkthrough hanya dapat di-submit pada jam operasional 09.00 - 21.00 WIB!" };
+      }
+    }
+
     var nowWibStr = Utilities.formatDate(now, "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss");
     var auditId = "AUD-" + payload.siteCode + "-" + now.getTime();
 
@@ -516,7 +554,6 @@ function submitAuditWalkthrough(payload) {
       }
     });
 
-    // BATCH WRITE ACTION ITEMS
     if (actionRowsStaged.length > 0) {
       var actionSheet = ss.getSheetByName("Action_Items");
       if (actionSheet) {
@@ -527,7 +564,6 @@ function submitAuditWalkthrough(payload) {
 
     var scorePct = totalQuestions > 0 ? Math.round((passCount / totalQuestions) * 100) + "%" : "100%";
     var initialStatus = failCount > 0 ? "Waiting Follow Up" : "Completed";
-    var explicitType = String(payload.checklistType || "REGULAR").trim().toUpperCase();
 
     if (sheet) {
       sheet.appendRow([
@@ -563,7 +599,7 @@ function submitAuditWalkthrough(payload) {
   }
 }
 
-// 5. UPDATE TINDAK LANJUT / REMIND SM (APPSEC BOLA DEFENSE)
+// 5. UPDATE TINDAK LANJUT / APPROVE / REMIND SM
 function updateActionItemRecord(actionId, newStatus, subordinateNotes, isReminder, callerStoreCode, callerRole) {
   var lock = LockService.getScriptLock();
   lock.tryLock(10000);
@@ -587,7 +623,6 @@ function updateActionItemRecord(actionId, newStatus, subordinateNotes, isReminde
       if (String(data[i][cActId]).trim() === String(actionId).trim()) {
         var rowStore = String(data[i][cSite] || "").trim();
 
-        // BOLA / IDOR DEFENSE
         if (cRoleNorm !== "RM" && cRoleNorm !== "ADMIN") {
           if (callerStoreCode && callerStoreCode !== "ALL" && rowStore !== String(callerStoreCode).trim()) {
             return { success: false, message: "Akses Ditolak: Anda tidak memiliki wewenang pada unit toko ini!" };
@@ -613,5 +648,68 @@ function updateActionItemRecord(actionId, newStatus, subordinateNotes, isReminde
     return { success: false, message: err.toString() };
   } finally {
     lock.releaseLock();
+  }
+}
+
+// 6. KHUSUS RM: DELETE TIKET MASUKAN
+function deleteActionItemRecord(actionId, callerRole) {
+  var cRoleNorm = normalizeInternalRole(callerRole);
+  if (cRoleNorm !== "RM" && cRoleNorm !== "ADMIN") {
+    return { success: false, message: "Akses Ditolak: Hanya Regional Manager yang berwenang menghapus temuan!" };
+  }
+
+  var lock = LockService.getScriptLock();
+  lock.tryLock(10000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Action_Items");
+    if (!sheet) return { success: false, message: "Sheet Action_Items tidak ditemukan!" };
+
+    var data = sheet.getDataRange().getValues();
+    var hMap = buildHeaderIndexMap(data[0]);
+    var cActId = hMap["ACTION_ID"] !== undefined ? hMap["ACTION_ID"] : 0;
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][cActId]).trim() === String(actionId).trim()) {
+        sheet.deleteRow(i + 1);
+        return { success: true, message: "Tiket temuan berhasil dihapus permanen oleh RM!" };
+      }
+    }
+    return { success: false, message: "Tiket tidak ditemukan!" };
+  } catch (err) {
+    return { success: false, message: err.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function doPost(e) {
+  try {
+    var raw = e.postData ? e.postData.contents : "{}";
+    var body = JSON.parse(raw);
+    var action = body.action;
+    var result = null;
+
+    if (action === "verifyLogin") {
+      result = verifyLoginCredentials(body.userId, body.password);
+    } else if (action === "getMasterData") {
+      result = getMasterData();
+    } else if (action === "getReports") {
+      result = getHistoricalReports(body.role, body.siteCode, body.region, body.userId);
+    } else if (action === "submitAudit") {
+      result = submitAuditWalkthrough(body.payload);
+    } else if (action === "updateAction") {
+      result = updateActionItemRecord(body.actionId, body.newStatus, body.notes, body.isReminder, body.storeCode, body.role);
+    } else if (action === "deleteAction") {
+      result = deleteActionItemRecord(body.actionId, body.role);
+    } else {
+      result = { success: false, message: "Aksi API tidak valid" };
+    }
+
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }

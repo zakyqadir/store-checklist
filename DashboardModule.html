@@ -1,5 +1,5 @@
 <!-- ======================================================== -->
-<!-- DASHBOARD VIEW: CHECKLIST REPORT HISTORY & STORE COMPL.  -->
+<!-- DASHBOARD VIEW: SEPARATE TYPE & FREQ, 24H WIB & FILTER   -->
 <!-- ======================================================== -->
 <main id="dashboardView" class="hidden max-w-7xl mx-auto px-4 py-5 space-y-4 print:hidden">
   
@@ -7,7 +7,6 @@
     <div class="bg-brand h-full animate-pulse w-full"></div>
   </div>
 
-  <!-- KARTU ANALITIK UTAMA -->
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
     <div class="bg-white p-3.5 rounded border border-corp-border shadow-xs">
       <span class="text-[10px] font-black uppercase text-corp-muted block">Rata-Rata Skor</span>
@@ -27,7 +26,6 @@
     </div>
   </div>
 
-  <!-- CHART DISTRIBUSI STATUS DINAMIS -->
   <div class="bg-white p-3 rounded border border-corp-border shadow-xs space-y-2">
     <div class="flex items-center justify-between text-xs">
       <span class="font-black text-corp-dark uppercase text-[10px] tracking-wider">Distribusi Status Checklist</span>
@@ -59,10 +57,8 @@
     </div>
   </div>
 
-  <!-- MATRIKS ANALITIK -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
-    
-    <!-- KIRI: PERFORMA AUDITOR -->
+    <!-- PERFORMA AUDITOR -->
     <div class="bg-white rounded border border-corp-border shadow-xs overflow-hidden flex flex-col">
       <div class="p-3 border-b border-corp-border flex flex-wrap items-center justify-between gap-2 bg-corp-surface">
         <div class="flex items-center space-x-2">
@@ -99,7 +95,7 @@
       </div>
     </div>
 
-    <!-- KANAN: STORE COMPLIANCE (EKS KEPATUHAN UNIT TOKO) -->
+    <!-- STORE COMPLIANCE -->
     <div class="bg-white rounded border border-corp-border shadow-xs overflow-hidden flex flex-col">
       <div class="p-3 border-b border-corp-border flex items-center justify-between bg-corp-surface">
         <span class="font-black text-corp-dark text-[11px] uppercase tracking-wider">STORE COMPLIANCE</span>
@@ -134,6 +130,15 @@
         </select>
       </div>
       <div class="flex items-center space-x-1">
+        <span class="font-bold text-corp-muted">Tipe:</span>
+        <select id="dashFilterType" onchange="renderDashboardView()" class="px-2 py-1 rounded border border-corp-border bg-corp-surface font-semibold text-corp-dark">
+          <option value="ALL">Semua Tipe</option>
+          <option value="REGULAR">Regular Walkthrough</option>
+          <option value="OPENING">Opening Store</option>
+          <option value="CLOSING">Closing Store</option>
+        </select>
+      </div>
+      <div class="flex items-center space-x-1">
         <span class="font-bold text-corp-muted">Frekuensi:</span>
         <select id="dashFilterFrequency" onchange="renderDashboardView()" class="px-2 py-1 rounded border border-corp-border bg-corp-surface font-semibold text-corp-dark">
           <option value="ALL">Semua Frekuensi</option>
@@ -159,7 +164,6 @@
       </div>
     </div>
 
-    <!-- QUICK PERIOD BUTTONS -->
     <div class="flex flex-wrap items-center gap-1">
       <button type="button" onclick="setDashboardQuickPeriod('TODAY')" class="px-2 py-1 rounded border font-bold text-[10px] hover:bg-slate-50">Hari Ini</button>
       <button type="button" onclick="setDashboardQuickPeriod('YESTERDAY')" class="px-2 py-1 rounded border font-bold text-[10px] hover:bg-slate-50">Kemarin</button>
@@ -170,7 +174,7 @@
     </div>
   </div>
 
-  <!-- TABEL RIWAYAT AUDIT: CHECKLIST REPORT HISTORY -->
+  <!-- TABEL RIWAYAT AUDIT (DIPISAH: TIPE & FREKUENSI) -->
   <div class="bg-white rounded border border-corp-border shadow-xs overflow-hidden">
     <div class="p-3 border-b border-corp-border flex items-center justify-between bg-corp-surface">
       <span class="font-black text-corp-dark text-[11px] uppercase tracking-wider">CHECKLIST REPORT HISTORY</span>
@@ -183,13 +187,14 @@
             <th class="p-2.5">Waktu (WIB)</th>
             <th class="p-2.5">Toko</th>
             <th class="p-2.5">Auditor</th>
-            <th class="p-2.5">Tipe &amp; Frekuensi</th>
+            <th class="p-2.5 text-center">Tipe</th>
+            <th class="p-2.5 text-center">Frekuensi</th>
             <th class="p-2.5 text-center">Skor</th>
             <th class="p-2.5 text-center">Status</th>
           </tr>
         </thead>
         <tbody id="tblDashboardBody" class="divide-y divide-corp-border">
-          <tr><td colspan="6" class="p-8 text-center text-corp-muted">Memuat data histori...</td></tr>
+          <tr><td colspan="7" class="p-8 text-center text-corp-muted">Memuat data histori...</td></tr>
         </tbody>
       </table>
     </div>
@@ -206,10 +211,21 @@
   function formatWibDisplay(ts) {
     if (!ts) return "-";
     try {
-      var d = new Date(ts.indexOf("T") === -1 ? ts.replace(/-/g, "/") : ts);
-      if (isNaN(d.getTime())) return ts;
-      return d.toLocaleDateString("id-ID", { day: 'numeric', month: 'short' }) + " • " +
-             d.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }) + " WIB";
+      var cleanStr = String(ts).replace('T', ' ').replace('Z', '').split('.')[0];
+      var parts = cleanStr.split(' ');
+      if (parts.length >= 2) {
+        var dateParts = parts[0].split('-');
+        var timeParts = parts[1].split(':');
+        if (dateParts.length === 3 && timeParts.length >= 2) {
+          var monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+          var day = parseInt(dateParts[2], 10);
+          var monthIdx = parseInt(dateParts[1], 10) - 1;
+          var hh = timeParts[0];
+          var mm = timeParts[1];
+          return day + " " + (monthNames[monthIdx] || dateParts[1]) + " • " + hh + "." + mm + " WIB";
+        }
+      }
+      return ts;
     } catch(e) { return ts; }
   }
 
@@ -268,12 +284,14 @@
   function getFilteredReports() {
     var elFrom = document.getElementById("dashDateFrom");
     var elTo = document.getElementById("dashDateTo");
+    var elType = document.getElementById("dashFilterType");
     var elFreq = document.getElementById("dashFilterFrequency");
     var elStore = document.getElementById("dashFilterStore");
     var elStatus = document.getElementById("dashFilterStatus");
 
     var fFrom = elFrom ? elFrom.value : "";
     var fTo = elTo ? elTo.value : "";
+    var fType = elType ? elType.value : "ALL";
     var fFreq = elFreq ? elFreq.value : "ALL";
     var fStore = elStore ? elStore.value : "ALL";
     var fStatus = elStatus ? elStatus.value : "ALL";
@@ -283,6 +301,7 @@
       var rDate = String(r.timestamp || "").substring(0, 10);
       if (fFrom && rDate && rDate < fFrom) return false;
       if (fTo && rDate && rDate > fTo) return false;
+      if (fType !== "ALL" && String(r.checklistType || "REGULAR").toUpperCase() !== fType) return false;
       if (fFreq !== "ALL" && String(r.frequency || "").toLowerCase() !== fFreq.toLowerCase()) return false;
       if (fStore !== "ALL" && String(r.siteCode) !== fStore) return false;
       if (fStatus !== "ALL" && String(r.processStatus || "").toLowerCase() !== fStatus.toLowerCase()) return false;
@@ -469,7 +488,6 @@
     }
   }
 
-  // LOGIKA STORE COMPLIANCE (MEMBACA CHECKLIST_TYPE SECARA PRESISI)
   function renderStoreCompliance() {
     var tbody = document.getElementById("tblStoreComplianceBody");
     if (!tbody) return;
@@ -516,7 +534,7 @@
     if (counter) counter.innerText = filtered.length + " Laporan";
 
     if (filtered.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-corp-muted">Tidak ada data laporan.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-corp-muted">Tidak ada data laporan.</td></tr>';
       return;
     }
 
@@ -536,11 +554,11 @@
       var cType = String(r.checklistType || "REGULAR").toUpperCase();
       var typeBadge = "";
       if (cType === "OPENING") {
-        typeBadge = '<span class="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 font-black text-[9px] uppercase border border-amber-300">Opening</span>';
+        typeBadge = '<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-black text-[9px] uppercase border border-amber-300">OPENING</span>';
       } else if (cType === "CLOSING") {
-        typeBadge = '<span class="px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-900 font-black text-[9px] uppercase border border-indigo-300">Closing</span>';
+        typeBadge = '<span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-900 font-black text-[9px] uppercase border border-indigo-300">CLOSING</span>';
       } else {
-        typeBadge = '<span class="px-1.5 py-0.2 rounded bg-slate-100 text-slate-800 font-bold text-[9px] uppercase">Walkthrough</span>';
+        typeBadge = '<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold text-[9px] uppercase border border-slate-200">WALKTHROUGH</span>';
       }
 
       return '<tr class="hover:bg-slate-50 transition">' +
@@ -550,12 +568,8 @@
           r.auditorName.split('(')[0] +
           '<span class="text-[10px] text-corp-muted block font-semibold">' + (r.jobTitle || "SUPERVISOR AREA") + '</span>' +
         '</td>' +
-        '<td class="p-2.5">' +
-          '<div class="flex items-center space-x-1.5">' +
-            typeBadge +
-            '<span class="text-[10px] font-semibold text-corp-muted">' + r.frequency + '</span>' +
-          '</div>' +
-        '</td>' +
+        '<td class="p-2.5 text-center">' + typeBadge + '</td>' +
+        '<td class="p-2.5 text-center"><span class="px-2 py-0.5 rounded bg-slate-50 font-bold text-[10px] text-corp-dark border border-corp-border">' + r.frequency + '</span></td>' +
         '<td class="p-2.5 text-center font-black ' + (sc >= 85 ? 'text-emerald-700' : 'text-brand') + '">' + sc + '%</td>' +
         '<td class="p-2.5 text-center">' +
           '<span class="px-2 py-0.5 rounded font-black text-[10px] uppercase ' + badgeCls + '">' + st + '</span>' +
@@ -664,6 +678,8 @@
       if (t) t.value = "";
       var elStatus = document.getElementById("dashFilterStatus");
       if (elStatus) elStatus.value = "ALL";
+      var elType = document.getElementById("dashFilterType");
+      if (elType) elType.value = "ALL";
     }
     renderDashboardView();
   }

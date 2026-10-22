@@ -1,9 +1,8 @@
 <!-- ======================================================== -->
-<!-- RESULT MODULE: RE-DESIGNED CLEAN TABLE & METRICS HEADER  -->
+<!-- RESULT MODULE: RM VERIFY & DELETE, 3-TIER AGING BADGE    -->
 <!-- ======================================================== -->
 <main id="resultView" class="hidden max-w-7xl mx-auto px-4 py-5 space-y-4 print:hidden">
   
-  <!-- SUMMARY CARD & CONTROL HEADER -->
   <div class="bg-white p-4 rounded border border-corp-border shadow-xs space-y-3">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-corp-border pb-3">
       <div>
@@ -47,7 +46,7 @@
     </div>
   </div>
 
-  <!-- TABLE CONTAINER BERSIH TANPA KOTAK BERTUMPUK -->
+  <!-- TABLE CONTAINER BERSIH -->
   <div class="bg-white rounded border border-corp-border shadow-xs overflow-hidden">
     <div class="max-h-[600px] overflow-y-auto">
       <table class="w-full text-left border-collapse text-xs table-fixed">
@@ -55,9 +54,9 @@
           <tr>
             <th class="p-2.5 w-[14%]">Waktu &amp; ID</th>
             <th class="p-2.5 w-[20%]">Unit Toko &amp; Auditor</th>
-            <th class="p-2.5 w-[42%]">Temuan &amp; Action Plan</th>
+            <th class="p-2.5 w-[38%]">Temuan &amp; Action Plan</th>
             <th class="p-2.5 w-[12%] text-center">Status &amp; SLA</th>
-            <th id="thActionHeader" class="p-2.5 w-[12%] text-center">Aksi</th>
+            <th id="thActionHeader" class="p-2.5 w-[16%] text-center">Aksi</th>
           </tr>
         </thead>
         <tbody id="tblActionItemsBody" class="divide-y divide-corp-border">
@@ -140,10 +139,21 @@
   function formatTimeWib(timestampStr) {
     if (!timestampStr) return "-";
     try {
-      var d = new Date(timestampStr.indexOf("T") === -1 ? timestampStr.replace(/-/g, "/") : timestampStr);
-      if (isNaN(d.getTime())) return timestampStr;
-      return d.toLocaleDateString("id-ID", { day: 'numeric', month: 'short' }) + " • " +
-             d.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }) + " WIB";
+      var cleanStr = String(timestampStr).replace('T', ' ').replace('Z', '').split('.')[0];
+      var parts = cleanStr.split(' ');
+      if (parts.length >= 2) {
+        var dateParts = parts[0].split('-');
+        var timeParts = parts[1].split(':');
+        if (dateParts.length === 3 && timeParts.length >= 2) {
+          var monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+          var day = parseInt(dateParts[2], 10);
+          var monthIdx = parseInt(dateParts[1], 10) - 1;
+          var hh = timeParts[0];
+          var mm = timeParts[1];
+          return day + " " + (monthNames[monthIdx] || dateParts[1]) + " • " + hh + "." + mm + " WIB";
+        }
+      }
+      return timestampStr;
     } catch(e) { return timestampStr; }
   }
 
@@ -155,7 +165,6 @@
     var selStore = document.getElementById("selResultStoreFilter");
     var fStore = selStore ? selStore.value : "ALL";
 
-    // Populate filter toko jika belum ada
     if (selStore && masterData.stores && selStore.options.length <= 1) {
       masterData.stores.forEach(function(s) {
         var opt = document.createElement("option");
@@ -172,7 +181,6 @@
     var overdueCount = ongoingItems.filter(function(a) { return a.isOverdue; }).length;
     var pendingCount = ongoingItems.filter(function(a) { return String(a.status || "").toLowerCase() === "pending"; }).length;
 
-    // Update Mini Metrics
     var mAct = document.getElementById("metricActiveIssues");
     var mOvd = document.getElementById("metricOverdueIssues");
     var mPnd = document.getElementById("metricPendingFollowUp");
@@ -196,26 +204,30 @@
     }
 
     tbody.innerHTML = items.map(function(act) {
-      var slaBadge = act.isOverdue ? (
-        '<span class="px-1.5 py-0.5 rounded bg-rose-600 text-white font-black text-[9px] uppercase tracking-wider block mt-1">' +
-          'Overdue • ' + act.ageHours + 'h' +
-        '</span>'
-      ) : (
-        '<span class="px-1.5 py-0.5 rounded bg-slate-100 text-corp-muted font-bold text-[9px] block mt-1">' +
-          act.ageHours + ' jam lalu' +
-        '</span>'
-      );
+      var slaBadge = "";
+      if (act.ageHours > 48) {
+        slaBadge = '<span class="px-1.5 py-0.5 rounded bg-rose-600 text-white font-black text-[9px] uppercase tracking-wider block mt-1">Overdue • ' + act.ageHours + 'h</span>';
+      } else if (act.ageHours >= 24) {
+        slaBadge = '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[9px] block mt-1">Mendekati SLA • ' + act.ageHours + 'h</span>';
+      } else {
+        slaBadge = '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[9px] block mt-1">' + act.ageHours + ' jam lalu</span>';
+      }
 
-      var actionBtn = "";
+      var actionBlock = "";
       if (currentActionSubTab === "ONGOING") {
-        if (curRole === "RM") {
-          actionBtn = '<button type="button" onclick="openActionModal(\'' + act.actionId + '\', true)" class="w-full py-1.5 px-2 rounded border border-amber-600 bg-white hover:bg-amber-50 text-amber-800 font-bold text-[10px] shadow-2xs transition">Remind SM</button>';
+        if (curRole === "RM" || curRole === "ADMIN") {
+          actionBlock = '<div class="flex flex-col space-y-1">' +
+            '<button type="button" onclick="verifyAndCloseTicket(\'' + act.actionId + '\')" class="w-full py-1 px-1.5 rounded bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[9px] shadow-xs transition">Approve &amp; Close</button>' +
+            '<div class="flex items-center space-x-1">' +
+              '<button type="button" onclick="openActionModal(\'' + act.actionId + '\', true)" class="flex-1 py-1 px-1 rounded border border-amber-600 bg-white hover:bg-amber-50 text-amber-800 font-bold text-[9px] shadow-2xs transition">Remind SM</button>' +
+              '<button type="button" onclick="executeRmDeleteTicket(\'' + act.actionId + '\')" class="py-1 px-1.5 rounded border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 font-bold text-[9px] shadow-2xs transition" title="Hapus Masukan">Hapus</button>' +
+            '</div>' +
+          '</div>';
         } else {
-          actionBtn = '<button type="button" onclick="openActionModal(\'' + act.actionId + '\', false)" class="w-full py-1.5 px-2 rounded bg-brand hover:bg-brand-dark text-white font-bold text-[10px] shadow-xs transition">Tindak Lanjut</button>';
+          actionBlock = '<button type="button" onclick="openActionModal(\'' + act.actionId + '\', false)" class="w-full py-1.5 px-2 rounded bg-brand hover:bg-brand-dark text-white font-bold text-[10px] shadow-xs transition">Tindak Lanjut</button>';
         }
       } else {
-        // TAB ARCHIVED: TAMPILKAN ANGKA HARI SAJA (MISAL: 2)
-        actionBtn = '<span class="font-black text-xs text-corp-dark block text-center">' + (act.slaDays || 0) + '</span>';
+        actionBlock = '<span class="font-black text-xs text-corp-dark block text-center">' + (act.slaDays || 0) + '</span>';
       }
 
       var displayName = (act.siteName && act.siteName !== act.siteCode) 
@@ -223,18 +235,15 @@
         : "Toko " + act.siteCode;
 
       return '<tr class="hover:bg-slate-50 transition border-b border-corp-border/60">' +
-        // WAKTU & ID
         '<td class="p-2.5 align-top">' +
           '<span class="font-bold text-corp-dark block text-[11px]">' + formatTimeWib(act.timestamp) + '</span>' +
           '<span class="text-[9px] text-corp-muted block mt-0.5 font-mono truncate" title="' + act.actionId + '">' + act.actionId.substring(0, 16) + '...</span>' +
         '</td>' +
-        // UNIT TOKO & AUDITOR
         '<td class="p-2.5 align-top">' +
           '<span class="font-black text-corp-dark block text-[11px] leading-tight">' + displayName + '</span>' +
           '<span class="text-[11px] font-semibold text-corp-dark block mt-0.5 truncate">' + act.auditorName.split('(')[0] + '</span>' +
           '<span class="text-[10px] text-corp-muted block truncate">' + act.jobTitle + '</span>' +
         '</td>' +
-        // TEMUAN & ACTION PLAN (BERSIH & TERSTRUKTUR TANPA KOTAK BERLAPIS)
         '<td class="p-2.5 align-top space-y-1.5">' +
           '<h4 class="font-bold text-corp-dark text-[11px] leading-tight">' + act.questionText + '</h4>' +
           '<div class="text-[11px] leading-tight">' +
@@ -246,17 +255,55 @@
             '<span class="font-normal">' + act.actionPlan + '</span>' +
           '</div>' +
         '</td>' +
-        // STATUS & SLA
         '<td class="p-2.5 align-top text-center">' +
           '<span class="px-2 py-0.5 rounded bg-slate-100 text-corp-dark font-black text-[10px] block">' + act.status + '</span>' +
           slaBadge +
         '</td>' +
-        // AKSI
         '<td class="p-2.5 align-top text-center">' +
-          actionBtn +
+          actionBlock +
         '</td>' +
       '</tr>';
     }).join("");
+  }
+
+  function verifyAndCloseTicket(actionId) {
+    if (!confirm("Apakah Anda yakin ingin memverifikasi dan menutup (Approve & Close) tiket temuan ini?")) return;
+    
+    var curRole = (currentUser && currentUser.role) ? currentUser.role : "RM";
+    var userStore = (currentUser && currentUser.storeCode) ? currentUser.storeCode : "ALL";
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.success) {
+          alert("Tiket berhasil diverifikasi dan ditutup (Archived)!");
+          loadAllOperationalData();
+        } else {
+          alert("Gagal: " + (res ? res.message : "Error"));
+        }
+      })
+      .withFailureHandler(function(err) {
+        alert("Koneksi gagal: " + err.toString());
+      })
+      .updateActionItemRecord(actionId, "Archived", "Diverifikasi & Disetujui oleh Regional Manager", false, userStore, curRole);
+  }
+
+  function executeRmDeleteTicket(actionId) {
+    if (!confirm("PERINGATAN: Tiket temuan ini akan dihapus secara permanen dari database. Lanjutkan?")) return;
+
+    var curRole = (currentUser && currentUser.role) ? currentUser.role : "RM";
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.success) {
+          alert(res.message);
+          loadAllOperationalData();
+        } else {
+          alert("Gagal hapus: " + (res ? res.message : "Error"));
+        }
+      })
+      .withFailureHandler(function(err) {
+        alert("Koneksi gagal: " + err.toString());
+      })
+      .deleteActionItemRecord(actionId, curRole);
   }
 
   function openActionModal(actionId, isReminder) {
